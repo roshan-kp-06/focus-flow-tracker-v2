@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Play, Square, Pause, Clock, Timer, Hourglass, Check, FolderOpen, Maximize2, MoreVertical, Trash2 } from 'lucide-react';
+import { Play, Square, Pause, Clock, Timer, Hourglass, Check, FolderOpen, Maximize2, MoreVertical, Trash2, StickyNote, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { TimerState, Project, TimerMode } from '@/types';
@@ -9,6 +9,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { RichTextEditor } from '@/components/notes/RichTextEditor';
 
 interface TimerBarProps {
   taskName: string;
@@ -23,6 +24,8 @@ interface TimerBarProps {
   formattedTime: string;
   state: TimerState;
   isOvertime?: boolean;
+  notes: string;
+  onNotesChange: (notes: string) => void;
   onStart: () => void;
   onPause: () => void;
   onResume: () => void;
@@ -44,6 +47,8 @@ export function TimerBar({
   formattedTime,
   state,
   isOvertime = false,
+  notes,
+  onNotesChange,
   onStart,
   onPause,
   onResume,
@@ -56,6 +61,7 @@ export function TimerBar({
   const [showStopConfirm, setShowStopConfirm] = useState(false);
   const [isEditingDuration, setIsEditingDuration] = useState(false);
   const [durationInput, setDurationInput] = useState('');
+  const [showNotesPanel, setShowNotesPanel] = useState(false);
   const durationInputRef = useRef<HTMLInputElement>(null);
 
   const getProjectById = (id: string) => projects.find(p => p.id === id);
@@ -112,8 +118,9 @@ export function TimerBar({
 
 
   return (
-    <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
-      <div className="flex items-center gap-4">
+    <div className="space-y-4">
+      <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
+        <div className="flex items-center gap-4">
         {/* Task Name Input */}
         <Input
           placeholder="What are you working on?"
@@ -182,6 +189,22 @@ export function TimerBar({
             <span>Focus</span>
           </button>
         )}
+
+        {/* Notes Button */}
+        <button
+          onClick={() => setShowNotesPanel(!showNotesPanel)}
+          className={cn(
+            "flex items-center gap-2 px-3 py-2 rounded-lg border border-border transition-colors text-sm",
+            showNotesPanel
+              ? "bg-primary text-primary-foreground"
+              : notes
+                ? "text-foreground hover:bg-muted/50"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+          )}
+        >
+          <StickyNote className="h-4 w-4" />
+          <span>Notes</span>
+        </button>
 
         {/* Divider */}
         <div className="h-8 w-px bg-border" />
@@ -272,7 +295,7 @@ export function TimerBar({
           {state === 'idle' && (
             <Button
               onClick={onStart}
-              className="h-10 gap-2 px-6 bg-primary hover:bg-primary/90 rounded-full"
+              className="h-10 gap-2 px-6"
             >
               <Play className="h-4 w-4 fill-current" />
               Start
@@ -427,7 +450,32 @@ export function TimerBar({
             )}
           </PopoverContent>
         </Popover>
+        </div>
       </div>
+
+      {/* Notes Panel */}
+      {showNotesPanel && (
+        <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <StickyNote className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Session Notes</span>
+            </div>
+            <button
+              onClick={() => setShowNotesPanel(false)}
+              className="p-1 rounded hover:bg-muted/50 transition-colors"
+            >
+              <X className="h-4 w-4 text-muted-foreground" />
+            </button>
+          </div>
+          <RichTextEditor
+            content={notes}
+            onChange={onNotesChange}
+            placeholder="Add notes for this task..."
+            className="min-h-[150px]"
+          />
+        </div>
+      )}
     </div>
   );
 }

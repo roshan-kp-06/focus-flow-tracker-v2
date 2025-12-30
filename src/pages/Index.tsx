@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useTimer } from '@/hooks/useTimer';
 import { useWorkSessions } from '@/hooks/useWorkSessions';
+import { useTaskPlanner } from '@/hooks/useTaskPlanner';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { TimerBar } from '@/components/timer/TimerBar';
 import { SessionList } from '@/components/timer/SessionList';
 import { WeekStats } from '@/components/timer/WeekStats';
 import { FocusView } from '@/components/timer/FocusView';
+import { Tasks } from '@/pages/Tasks';
 import { Settings } from '@/pages/Settings';
-import { DailyChart } from '@/components/DailyChart';
-import { ProjectBreakdown } from '@/components/ProjectBreakdown';
-import { MonthSummary } from '@/components/MonthSummary';
+import { Reports } from '@/pages/Reports';
 import { WorkSession } from '@/types';
 import { List, Calendar, CalendarDays } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -17,11 +17,12 @@ import { cn } from '@/lib/utils';
 type ViewMode = 'list' | 'week' | 'day';
 
 const Index = () => {
-  const [activeTab, setActiveTab] = useState<'timer' | 'reports' | 'settings'>('timer');
+  const [activeTab, setActiveTab] = useState<'timer' | 'tasks' | 'reports' | 'settings'>('timer');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [isFocusMode, setIsFocusMode] = useState(false);
   const timer = useTimer();
   const sessions = useWorkSessions();
+  const taskPlanner = useTaskPlanner();
 
   // Refresh sessions when timer stops
   useEffect(() => {
@@ -38,6 +39,17 @@ const Index = () => {
   const handleContinueSession = (session: WorkSession) => {
     timer.setTaskName(session.taskName);
     timer.setProjectIds(session.projectIds);
+
+    // Handle groupId for sub-sessions (Clockify-style grouping)
+    if (session.groupId) {
+      // Session already belongs to a group, use that groupId
+      timer.setGroupId(session.groupId);
+    } else {
+      // Create a new groupId and update the existing session to use it
+      const newGroupId = crypto.randomUUID();
+      sessions.editSession(session.id, { groupId: newGroupId });
+      timer.setGroupId(newGroupId);
+    }
     // Don't auto-start - just populate the task info and let user configure & start
   };
 
@@ -65,6 +77,8 @@ const Index = () => {
                 formattedTime={timer.formattedTime}
                 state={timer.config.state}
                 isOvertime={timer.isOvertime}
+                notes={timer.notes}
+                onNotesChange={timer.setNotes}
                 onStart={timer.start}
                 onPause={timer.pause}
                 onResume={timer.resume}
@@ -131,26 +145,26 @@ const Index = () => {
             </div>
           )}
 
+          {activeTab === 'tasks' && (
+            <Tasks
+              taskPlanner={taskPlanner}
+              projects={sessions.projects}
+              onStartTimer={(task) => {
+                timer.setTaskName(task.title);
+                timer.setProjectIds(task.projectIds);
+                timer.setPlannerTaskId(task.id);
+                timer.start();
+                setActiveTab('timer');
+              }}
+              timerState={timer.config.state}
+            />
+          )}
+
           {activeTab === 'reports' && (
-            <div className="space-y-6">
-              <h1 className="text-xl font-semibold">Reports</h1>
-
-              {/* Month Summary */}
-              <MonthSummary
-                monthTotal={sessions.getMonthTotal()}
-                weekTotal={sessions.getWeekTotal()}
-                sessionCount={sessions.getMonthSessions().length}
-              />
-
-              {/* Charts */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <DailyChart data={sessions.getDailyBreakdown()} />
-                <ProjectBreakdown
-                  data={sessions.getProjectBreakdown()}
-                  totalSeconds={sessions.getMonthTotal()}
-                />
-              </div>
-            </div>
+            <Reports
+              sessions={sessions.sessions}
+              projects={sessions.projects}
+            />
           )}
 
           {activeTab === 'settings' && (
@@ -170,6 +184,7 @@ const Index = () => {
           taskName={timer.config.taskName}
           onTaskNameChange={timer.setTaskName}
           projectIds={timer.config.projectIds}
+          onProjectChange={timer.setProjectIds}
           projects={sessions.projects}
           mode={timer.config.mode}
           onModeChange={timer.setMode}
@@ -179,6 +194,8 @@ const Index = () => {
           duration={timer.config.duration}
           onDurationChange={timer.setDuration}
           elapsed={timer.config.elapsed}
+          notes={timer.notes}
+          onNotesChange={timer.setNotes}
           onStart={timer.start}
           onPause={timer.pause}
           onResume={timer.resume}

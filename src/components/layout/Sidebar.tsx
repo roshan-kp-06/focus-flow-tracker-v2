@@ -1,14 +1,15 @@
-import { Timer, BarChart3, Settings, Focus } from 'lucide-react';
+import { Timer, BarChart3, Settings, Focus, CheckSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SidebarProps {
-  activeTab: 'timer' | 'reports' | 'settings';
-  onTabChange: (tab: 'timer' | 'reports' | 'settings') => void;
+  activeTab: 'timer' | 'tasks' | 'reports' | 'settings';
+  onTabChange: (tab: 'timer' | 'tasks' | 'reports' | 'settings') => void;
 }
 
 export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
   const navItems = [
     { id: 'timer' as const, label: 'Timer', icon: Timer },
+    { id: 'tasks' as const, label: 'Tasks', icon: CheckSquare },
     { id: 'reports' as const, label: 'Reports', icon: BarChart3 },
   ];
 

@@ -15,7 +15,7 @@ export function WeekStats({ weekTotal }: WeekStatsProps) {
   return (
     <div className="flex items-center gap-3">
       <span className="text-sm font-medium text-muted-foreground">This Week:</span>
-      <div className="flex items-center gap-2 bg-card border border-border rounded-full px-4 py-2">
+      <div className="flex items-center gap-2 bg-card border border-border rounded-lg px-4 py-2">
         <Clock className="h-4 w-4 text-muted-foreground" />
         <span className="font-semibold text-foreground">{formatDuration(weekTotal)}</span>
       </div>

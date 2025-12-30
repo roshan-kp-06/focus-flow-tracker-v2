@@ -1,4 +1,4 @@
-import { Clock, Play, MoreHorizontal, Trash2, Check } from 'lucide-react';
+import { Clock, Play, MoreHorizontal, Trash2, Check, ChevronDown, ChevronRight, StickyNote } from 'lucide-react';
 import { format, parseISO, startOfWeek, isToday, isYesterday } from 'date-fns';
 import { WorkSession, Project } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,17 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { RichTextEditor } from '@/components/notes/RichTextEditor';
+import { cn } from '@/lib/utils';
+
+// Represents a group of related sessions (via groupId) or a standalone session
+interface SessionGroup {
+  groupId: string | null;
+  taskName: string;
+  projectIds: string[];
+  sessions: WorkSession[];
+  totalDuration: number;
+}
 
 interface SessionListProps {
   sessions: WorkSession[];
@@ -31,6 +42,83 @@ export function SessionList({
   const [filterProjectId, setFilterProjectId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [bulkDeleteConfirmDate, setBulkDeleteConfirmDate] = useState<string | null>(null);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
+
+  const toggleNotesExpanded = (id: string) => {
+    const newExpanded = new Set(expandedNotes);
+    if (newExpanded.has(id)) {
+      newExpanded.delete(id);
+    } else {
+      newExpanded.add(id);
+    }
+    setExpandedNotes(newExpanded);
+  };
+
+  const toggleGroupExpanded = (groupId: string) => {
+    const newExpanded = new Set(expandedGroups);
+    if (newExpanded.has(groupId)) {
+      newExpanded.delete(groupId);
+    } else {
+      newExpanded.add(groupId);
+    }
+    setExpandedGroups(newExpanded);
+  };
+
+  // Group sessions by groupId for Clockify-style display
+  const groupSessionsByGroupId = (daySessions: WorkSession[]): SessionGroup[] => {
+    const groups: Map<string, SessionGroup> = new Map();
+    const standaloneGroups: SessionGroup[] = [];
+
+    // Sort sessions by start time descending first
+    const sortedSessions = [...daySessions].sort(
+      (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+    );
+
+    sortedSessions.forEach(session => {
+      if (session.groupId) {
+        if (groups.has(session.groupId)) {
+          const group = groups.get(session.groupId)!;
+          group.sessions.push(session);
+          group.totalDuration += session.duration;
+        } else {
+          groups.set(session.groupId, {
+            groupId: session.groupId,
+            taskName: session.taskName,
+            projectIds: session.projectIds,
+            sessions: [session],
+            totalDuration: session.duration,
+          });
+        }
+      } else {
+        // Standalone session (no groupId)
+        standaloneGroups.push({
+          groupId: null,
+          taskName: session.taskName,
+          projectIds: session.projectIds,
+          sessions: [session],
+          totalDuration: session.duration,
+        });
+      }
+    });
+
+    // Sort sessions within each group by start time (oldest first for sub-sessions)
+    groups.forEach(group => {
+      group.sessions.sort(
+        (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+      );
+    });
+
+    // Combine grouped and standalone, maintaining time order
+    const allGroups = [...groups.values(), ...standaloneGroups];
+
+    // Sort by most recent session in each group
+    return allGroups.sort((a, b) => {
+      const aLatest = Math.max(...a.sessions.map(s => new Date(s.startTime).getTime()));
+      const bLatest = Math.max(...b.sessions.map(s => new Date(s.startTime).getTime()));
+      return bLatest - aLatest;
+    });
+  };
 
   const formatDuration = (seconds: number) => {
     const hrs = Math.floor(seconds / 3600);
@@ -291,7 +379,7 @@ export function SessionList({
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-sm text-muted-foreground">Total :</span>
-                    <div className="flex items-center gap-2 bg-background border border-border rounded-full px-3 py-1">
+                    <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-3 py-1">
                       <Clock className="h-3.5 w-3.5 text-muted-foreground" />
                       <span className="text-sm font-semibold">{formatDuration(getDateTotal(daySessions))}</span>
                     </div>
@@ -337,176 +425,368 @@ export function SessionList({
                   </div>
                 </div>
 
-                {/* Sessions */}
+                {/* Sessions - grouped by groupId (Clockify-style) */}
                 <div className="divide-y divide-border">
-                  {daySessions.map((session) => (
-                    <div
-                      key={session.id}
-                      className="grid grid-cols-[auto_1fr_140px_180px_100px_auto_auto] items-center gap-4 px-5 py-3 hover:bg-muted/30 transition-colors"
-                    >
-                      {/* Checkbox */}
-                      <Checkbox
-                        checked={selectedSessions.has(session.id)}
-                        onCheckedChange={() => toggleSession(session.id)}
-                        className="border-muted-foreground/40"
-                      />
+                  {groupSessionsByGroupId(daySessions).map((group) => {
+                    const isGrouped = group.groupId !== null && group.sessions.length > 1;
+                    const isExpanded = group.groupId ? expandedGroups.has(group.groupId) : false;
+                    const primarySession = group.sessions[group.sessions.length - 1]; // Most recent
 
-                      {/* Task Name - Editable */}
-                      <div className="min-w-0">
-                        <input
-                          type="text"
-                          defaultValue={session.taskName || 'Untitled session'}
-                          onBlur={(e) => handleInlineEdit(session.id, 'taskName', e.target.value)}
-                          className="text-sm font-medium text-foreground bg-transparent border border-transparent w-full rounded-lg px-2 py-1 -ml-2 truncate transition-all cursor-text hover:bg-muted/50 focus:bg-background focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                        />
-                        {session.projectIds.length > 0 && (
-                          <p className="text-xs text-muted-foreground mt-0.5 ml-0.5">
-                            {session.projectIds.map(id => getProjectById(id)?.name).filter(Boolean).join(', ')}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Project Badge - Click to toggle */}
-                      <div className="flex items-center justify-start">
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <button className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity">
-                              {session.projectIds.length > 0 ? (
-                                (() => {
-                                  const project = getProjectById(session.projectIds[0]);
-                                  if (!project) return <span className="text-muted-foreground">No project</span>;
-                                  return (
-                                    <span
-                                      className="inline-flex items-center gap-1.5"
-                                      style={{
-                                        backgroundColor: `${project.color}18`,
-                                        color: project.color,
-                                        padding: '4px 10px',
-                                        borderRadius: '9999px',
-                                      }}
-                                    >
-                                      <span
-                                        className="w-1.5 h-1.5 rounded-full"
-                                        style={{ backgroundColor: project.color }}
-                                      />
-                                      {project.name}
-                                    </span>
-                                  );
-                                })()
-                              ) : (
-                                <span className="text-muted-foreground text-xs">+ Add project</span>
-                              )}
-                            </button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-48 p-1" align="start">
-                            <div className="text-xs font-medium text-muted-foreground px-2 py-1.5">
-                              Select Project
-                            </div>
-                            {projects.map((project) => (
+                    return (
+                      <div key={group.groupId || primarySession.id}>
+                        {/* Group Header / Single Session Row */}
+                        <div
+                          className="grid grid-cols-[auto_auto_1fr_140px_180px_100px_auto_auto] items-center gap-4 px-5 py-3 hover:bg-muted/30 transition-colors"
+                        >
+                          {/* Expand/Collapse for groups */}
+                          <div className="w-5 flex justify-center">
+                            {isGrouped ? (
                               <button
-                                key={project.id}
-                                onClick={() => handleProjectToggle(session.id, project.id, session.projectIds)}
-                                className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted transition-colors"
+                                onClick={() => toggleGroupExpanded(group.groupId!)}
+                                className="p-0.5 hover:bg-muted rounded transition-colors"
                               >
-                                <span
-                                  className="w-2.5 h-2.5 rounded-full"
-                                  style={{ backgroundColor: project.color }}
-                                />
-                                <span className="flex-1 text-left">{project.name}</span>
-                                {session.projectIds.includes(project.id) && (
-                                  <Check className="h-3.5 w-3.5 text-primary" />
+                                {isExpanded ? (
+                                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
                                 )}
                               </button>
-                            ))}
-                          </PopoverContent>
-                        </Popover>
-                      </div>
+                            ) : null}
+                          </div>
 
-                      {/* Time Range - Editable */}
-                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                        <Clock className="h-3.5 w-3.5 flex-shrink-0" />
-                        <input
-                          type="time"
-                          defaultValue={formatTimeOnly(session.startTime)}
-                          onBlur={(e) => handleTimeEdit(session, 'startTime', e.target.value)}
-                          className="bg-transparent border border-transparent w-[70px] rounded-lg px-1 py-0.5 transition-all cursor-text hover:bg-muted/50 focus:bg-background focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute"
-                        />
-                        <span>-</span>
-                        <input
-                          type="time"
-                          defaultValue={formatTimeOnly(session.endTime)}
-                          onBlur={(e) => handleTimeEdit(session, 'endTime', e.target.value)}
-                          className="bg-transparent border border-transparent w-[70px] rounded-lg px-1 py-0.5 transition-all cursor-text hover:bg-muted/50 focus:bg-background focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute"
-                        />
-                      </div>
+                          {/* Checkbox */}
+                          <Checkbox
+                            checked={group.sessions.every(s => selectedSessions.has(s.id))}
+                            onCheckedChange={(checked) => {
+                              const newSelected = new Set(selectedSessions);
+                              group.sessions.forEach(s => {
+                                if (checked) {
+                                  newSelected.add(s.id);
+                                } else {
+                                  newSelected.delete(s.id);
+                                }
+                              });
+                              setSelectedSessions(newSelected);
+                            }}
+                            className="border-muted-foreground/40"
+                          />
 
-                      {/* Duration */}
-                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                        <Clock className="h-3.5 w-3.5" />
-                        <span className="font-medium text-foreground">{formatDuration(session.duration)}</span>
-                      </div>
+                          {/* Task Name - Editable */}
+                          <div className="min-w-0 flex items-center gap-2">
+                            <input
+                              type="text"
+                              defaultValue={group.taskName || 'Untitled session'}
+                              onBlur={(e) => {
+                                // Update all sessions in the group
+                                group.sessions.forEach(s => {
+                                  handleInlineEdit(s.id, 'taskName', e.target.value);
+                                });
+                              }}
+                              className="text-sm font-medium text-foreground bg-transparent border border-transparent flex-1 rounded-lg px-2 py-1 -ml-2 truncate transition-all cursor-text hover:bg-muted/50 focus:bg-background focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                            />
+                            {isGrouped && (
+                              <span className="flex-shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                                {group.sessions.length}
+                              </span>
+                            )}
+                          </div>
 
-                      {/* Continue Button */}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onContinueSession(session)}
-                        className="h-8 gap-1.5 text-muted-foreground hover:text-foreground"
-                      >
-                        <Play className="h-3.5 w-3.5" />
-                        Continue
-                      </Button>
+                          {/* Project Badge - Click to toggle */}
+                          <div className="flex items-center justify-start">
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <button className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity">
+                                  {group.projectIds.length > 0 ? (
+                                    (() => {
+                                      const project = getProjectById(group.projectIds[0]);
+                                      if (!project) return <span className="text-muted-foreground">No project</span>;
+                                      return (
+                                        <span
+                                          className="inline-flex items-center gap-1.5"
+                                          style={{
+                                            backgroundColor: `${project.color}18`,
+                                            color: project.color,
+                                            padding: '4px 10px',
+                                            borderRadius: '9999px',
+                                          }}
+                                        >
+                                          <span
+                                            className="w-1.5 h-1.5 rounded-full"
+                                            style={{ backgroundColor: project.color }}
+                                          />
+                                          {project.name}
+                                        </span>
+                                      );
+                                    })()
+                                  ) : (
+                                    <span className="text-muted-foreground text-xs">+ Add project</span>
+                                  )}
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-48 p-1" align="start">
+                                <div className="text-xs font-medium text-muted-foreground px-2 py-1.5">
+                                  Select Project
+                                </div>
+                                {projects.map((project) => (
+                                  <button
+                                    key={project.id}
+                                    onClick={() => {
+                                      // Update all sessions in the group
+                                      group.sessions.forEach(s => {
+                                        handleProjectToggle(s.id, project.id, s.projectIds);
+                                      });
+                                    }}
+                                    className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted transition-colors"
+                                  >
+                                    <span
+                                      className="w-2.5 h-2.5 rounded-full"
+                                      style={{ backgroundColor: project.color }}
+                                    />
+                                    <span className="flex-1 text-left">{project.name}</span>
+                                    {group.projectIds.includes(project.id) && (
+                                      <Check className="h-3.5 w-3.5 text-primary" />
+                                    )}
+                                  </button>
+                                ))}
+                              </PopoverContent>
+                            </Popover>
+                          </div>
 
-                      {/* More Actions */}
-                      <Popover
-                        open={deleteConfirmId === session.id}
-                        onOpenChange={(open) => setDeleteConfirmId(open ? session.id : null)}
-                      >
-                        <PopoverTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-48 p-1" align="end">
-                          {deleteConfirmId !== session.id ? (
-                            <button
-                              onClick={() => setDeleteConfirmId(session.id)}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded hover:bg-destructive/10 text-destructive transition-colors"
+                          {/* Time Range - Show first to last for groups */}
+                          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                            <Clock className="h-3.5 w-3.5 flex-shrink-0" />
+                            {isGrouped ? (
+                              <span>
+                                {formatTimeOnly(group.sessions[0].startTime)} - {formatTimeOnly(group.sessions[group.sessions.length - 1].endTime)}
+                              </span>
+                            ) : (
+                              <>
+                                <input
+                                  type="time"
+                                  defaultValue={formatTimeOnly(primarySession.startTime)}
+                                  onBlur={(e) => handleTimeEdit(primarySession, 'startTime', e.target.value)}
+                                  className="bg-transparent border border-transparent w-[70px] rounded-lg px-1 py-0.5 transition-all cursor-text hover:bg-muted/50 focus:bg-background focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute"
+                                />
+                                <span>-</span>
+                                <input
+                                  type="time"
+                                  defaultValue={formatTimeOnly(primarySession.endTime)}
+                                  onBlur={(e) => handleTimeEdit(primarySession, 'endTime', e.target.value)}
+                                  className="bg-transparent border border-transparent w-[70px] rounded-lg px-1 py-0.5 transition-all cursor-text hover:bg-muted/50 focus:bg-background focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute"
+                                />
+                              </>
+                            )}
+                          </div>
+
+                          {/* Duration - Total for groups */}
+                          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                            <Clock className="h-3.5 w-3.5" />
+                            <span className="font-medium text-foreground">{formatDuration(group.totalDuration)}</span>
+                          </div>
+
+                          {/* Continue Button */}
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => onContinueSession(primarySession)}
+                              className="h-8 gap-1.5 text-muted-foreground hover:text-foreground"
                             >
-                              <Trash2 className="h-4 w-4" />
-                              Delete Session
+                              <Play className="h-3.5 w-3.5" />
+                              Continue
+                            </Button>
+
+                            {/* Notes indicator - always visible, highlighted if has notes */}
+                            <button
+                              onClick={() => toggleNotesExpanded(group.groupId || primarySession.id)}
+                              className={cn(
+                                "flex items-center justify-center w-8 h-8 rounded-lg transition-colors",
+                                expandedNotes.has(group.groupId || primarySession.id)
+                                  ? "bg-primary/10 text-primary"
+                                  : group.sessions.some(s => s.notes)
+                                    ? "text-foreground hover:bg-muted"
+                                    : "text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted"
+                              )}
+                              title={group.sessions.some(s => s.notes) ? "View notes" : "Add notes"}
+                            >
+                              <StickyNote className="h-4 w-4" />
                             </button>
-                          ) : (
-                            <div className="p-2">
-                              <p className="text-sm font-medium mb-2">Delete this session?</p>
-                              <p className="text-xs text-muted-foreground mb-3">This action cannot be undone.</p>
-                              <div className="flex gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="flex-1 h-8"
-                                  onClick={() => setDeleteConfirmId(null)}
+                          </div>
+
+                          {/* More Actions */}
+                          <Popover
+                            open={deleteConfirmId === (group.groupId || primarySession.id)}
+                            onOpenChange={(open) => setDeleteConfirmId(open ? (group.groupId || primarySession.id) : null)}
+                          >
+                            <PopoverTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-48 p-1" align="end">
+                              {deleteConfirmId !== (group.groupId || primarySession.id) ? (
+                                <button
+                                  onClick={() => setDeleteConfirmId(group.groupId || primarySession.id)}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded hover:bg-destructive/10 text-destructive transition-colors"
                                 >
-                                  Cancel
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  className="flex-1 h-8"
-                                  onClick={() => {
-                                    onDeleteSession(session.id);
-                                    setDeleteConfirmId(null);
-                                  }}
+                                  <Trash2 className="h-4 w-4" />
+                                  {isGrouped ? `Delete ${group.sessions.length} Sessions` : 'Delete Session'}
+                                </button>
+                              ) : (
+                                <div className="p-2">
+                                  <p className="text-sm font-medium mb-2">
+                                    Delete {isGrouped ? `${group.sessions.length} sessions` : 'this session'}?
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mb-3">This action cannot be undone.</p>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="flex-1 h-8"
+                                      onClick={() => setDeleteConfirmId(null)}
+                                    >
+                                      Cancel
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="destructive"
+                                      className="flex-1 h-8"
+                                      onClick={() => {
+                                        group.sessions.forEach(s => onDeleteSession(s.id));
+                                        setDeleteConfirmId(null);
+                                      }}
+                                    >
+                                      Delete
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+
+                        {/* Sub-sessions (when expanded) */}
+                        {isGrouped && isExpanded && (
+                          <div className="bg-muted/20 border-t border-border">
+                            {group.sessions.map((session, idx) => (
+                              <div
+                                key={session.id}
+                                className="grid grid-cols-[auto_auto_1fr_140px_180px_100px_auto_auto] items-center gap-4 px-5 py-2.5 hover:bg-muted/30 transition-colors border-b border-border/50 last:border-b-0"
+                              >
+                                {/* Indent spacer */}
+                                <div className="w-5" />
+
+                                {/* Checkbox */}
+                                <Checkbox
+                                  checked={selectedSessions.has(session.id)}
+                                  onCheckedChange={() => toggleSession(session.id)}
+                                  className="border-muted-foreground/40"
+                                />
+
+                                {/* Sub-session indicator */}
+                                <div className="min-w-0 flex items-center gap-2 pl-4">
+                                  <div className="w-4 h-4 border-l-2 border-b-2 border-muted-foreground/30 rounded-bl-sm -mt-2" />
+                                  <span className="text-sm text-muted-foreground">
+                                    Session {idx + 1}
+                                  </span>
+                                </div>
+
+                                {/* Empty project column */}
+                                <div />
+
+                                {/* Time Range - Editable */}
+                                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                                  <Clock className="h-3.5 w-3.5 flex-shrink-0" />
+                                  <input
+                                    type="time"
+                                    defaultValue={formatTimeOnly(session.startTime)}
+                                    onBlur={(e) => handleTimeEdit(session, 'startTime', e.target.value)}
+                                    className="bg-transparent border border-transparent w-[70px] rounded-lg px-1 py-0.5 transition-all cursor-text hover:bg-muted/50 focus:bg-background focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute"
+                                  />
+                                  <span>-</span>
+                                  <input
+                                    type="time"
+                                    defaultValue={formatTimeOnly(session.endTime)}
+                                    onBlur={(e) => handleTimeEdit(session, 'endTime', e.target.value)}
+                                    className="bg-transparent border border-transparent w-[70px] rounded-lg px-1 py-0.5 transition-all cursor-text hover:bg-muted/50 focus:bg-background focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute"
+                                  />
+                                </div>
+
+                                {/* Duration */}
+                                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                                  <Clock className="h-3.5 w-3.5" />
+                                  <span className="font-medium text-foreground">{formatDuration(session.duration)}</span>
+                                </div>
+
+                                {/* Empty actions columns */}
+                                <div />
+
+                                {/* Delete sub-session */}
+                                <Popover
+                                  open={deleteConfirmId === session.id}
+                                  onOpenChange={(open) => setDeleteConfirmId(open ? session.id : null)}
                                 >
-                                  Delete
-                                </Button>
+                                  <PopoverTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                                      <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-48 p-2" align="end">
+                                    <p className="text-sm font-medium mb-2">Delete this sub-session?</p>
+                                    <p className="text-xs text-muted-foreground mb-3">This action cannot be undone.</p>
+                                    <div className="flex gap-2">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="flex-1 h-8"
+                                        onClick={() => setDeleteConfirmId(null)}
+                                      >
+                                        Cancel
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        className="flex-1 h-8"
+                                        onClick={() => {
+                                          onDeleteSession(session.id);
+                                          setDeleteConfirmId(null);
+                                        }}
+                                      >
+                                        Delete
+                                      </Button>
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
                               </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Notes section (when expanded) - always shown when expanded */}
+                        {expandedNotes.has(group.groupId || primarySession.id) && (
+                          <div className="px-5 py-4 bg-muted/20 border-t border-border">
+                            <div className="ml-[52px] space-y-4">
+                              {group.sessions.map((session, sessionIdx) => (
+                                <div key={session.id}>
+                                  {group.sessions.length > 1 && (
+                                    <p className="text-xs text-muted-foreground mb-2">
+                                      Session {sessionIdx + 1} - {formatTimeOnly(session.startTime)}
+                                    </p>
+                                  )}
+                                  <RichTextEditor
+                                    content={session.notes || ''}
+                                    onChange={(notes) => onUpdateSession?.(session.id, { notes })}
+                                    placeholder="Add notes for this session..."
+                                    className="min-h-[100px]"
+                                  />
+                                </div>
+                              ))}
                             </div>
-                          )}
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                  ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );

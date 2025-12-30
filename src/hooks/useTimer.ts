@@ -8,6 +8,8 @@ interface StoredTimerState {
   config: TimerConfig;
   startTime: string | null;
   lastUpdateTime: string | null;
+  notes?: string;
+  plannerTaskId?: string;
 }
 
 const initialConfig: TimerConfig = {
@@ -19,7 +21,11 @@ const initialConfig: TimerConfig = {
   projectIds: [],
 };
 
-function loadTimerState(): { config: TimerConfig; startTime: string | null } {
+// Track the groupId for sub-sessions (Continue feature)
+let pendingGroupId: string | null = null;
+let pendingPlannerTaskId: string | null = null;
+
+function loadTimerState(): { config: TimerConfig; startTime: string | null; notes: string; plannerTaskId: string | null } {
   try {
     const stored = localStorage.getItem(TIMER_STORAGE_KEY);
     if (stored) {
@@ -36,19 +42,23 @@ function loadTimerState(): { config: TimerConfig; startTime: string | null } {
       return {
         config: parsed.config,
         startTime: parsed.startTime,
+        notes: parsed.notes || '',
+        plannerTaskId: parsed.plannerTaskId || null,
       };
     }
   } catch {
     // Ignore parse errors
   }
-  return { config: initialConfig, startTime: null };
+  return { config: initialConfig, startTime: null, notes: '', plannerTaskId: null };
 }
 
-function saveTimerState(config: TimerConfig, startTime: string | null) {
+function saveTimerState(config: TimerConfig, startTime: string | null, notes: string, plannerTaskId: string | null) {
   const state: StoredTimerState = {
     config,
     startTime,
     lastUpdateTime: new Date().toISOString(),
+    notes,
+    plannerTaskId: plannerTaskId || undefined,
   };
   localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify(state));
 }
@@ -59,24 +69,31 @@ function clearTimerState() {
 
 export function useTimer() {
   const [config, setConfig] = useState<TimerConfig>(() => loadTimerState().config);
+  const [notes, setNotes] = useState<string>(() => loadTimerState().notes);
+  const [plannerTaskId, setPlannerTaskIdState] = useState<string | null>(() => loadTimerState().plannerTaskId);
   const [countdownComplete, setCountdownComplete] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<string | null>(() => loadTimerState().startTime);
 
-  // Initialize startTimeRef from localStorage
+  // Initialize startTimeRef, notes, and plannerTaskId from localStorage
   useEffect(() => {
-    const { startTime } = loadTimerState();
+    const { startTime, notes: storedNotes, plannerTaskId: storedPlannerTaskId } = loadTimerState();
     startTimeRef.current = startTime;
+    if (storedNotes) setNotes(storedNotes);
+    if (storedPlannerTaskId) {
+      setPlannerTaskIdState(storedPlannerTaskId);
+      pendingPlannerTaskId = storedPlannerTaskId;
+    }
   }, []);
 
-  // Save timer state whenever config changes
+  // Save timer state whenever config, notes, or plannerTaskId changes
   useEffect(() => {
-    if (config.state === 'idle' && config.taskName === '' && config.projectIds.length === 0) {
+    if (config.state === 'idle' && config.taskName === '' && config.projectIds.length === 0 && !notes && !plannerTaskId) {
       clearTimerState();
     } else {
-      saveTimerState(config, startTimeRef.current);
+      saveTimerState(config, startTimeRef.current, notes, plannerTaskId);
     }
-  }, [config]);
+  }, [config, notes, plannerTaskId]);
 
   const clearTimerInterval = useCallback(() => {
     if (intervalRef.current) {
@@ -139,12 +156,19 @@ export function useTimer() {
         duration: config.elapsed,
         startTime: startTimeRef.current,
         endTime: now.toISOString(),
+        groupId: pendingGroupId || undefined,
+        notes: notes || undefined,
+        plannerTaskId: pendingPlannerTaskId || undefined,
       };
       addSession(session);
     }
 
     startTimeRef.current = null;
+    pendingGroupId = null;
+    pendingPlannerTaskId = null;
     setCountdownComplete(false);
+    setNotes('');
+    setPlannerTaskIdState(null);
     setConfig(prev => ({
       ...prev,
       elapsed: 0,
@@ -153,12 +177,13 @@ export function useTimer() {
       projectIds: [],
     }));
     clearTimerState();
-  }, [config.elapsed, config.taskName, config.projectIds, clearTimerInterval]);
+  }, [config.elapsed, config.taskName, config.projectIds, notes, clearTimerInterval]);
 
   const reset = useCallback(() => {
     clearTimerInterval();
     startTimeRef.current = null;
     setCountdownComplete(false);
+    setNotes('');
     setConfig(prev => ({
       ...prev,
       elapsed: 0,
@@ -169,7 +194,10 @@ export function useTimer() {
   const discard = useCallback(() => {
     clearTimerInterval();
     startTimeRef.current = null;
+    pendingPlannerTaskId = null;
     setCountdownComplete(false);
+    setNotes('');
+    setPlannerTaskIdState(null);
     setConfig(prev => ({
       ...prev,
       elapsed: 0,
@@ -198,6 +226,15 @@ export function useTimer() {
 
   const setProjectIds = useCallback((projectIds: string[]) => {
     setConfig(prev => ({ ...prev, projectIds }));
+  }, []);
+
+  const setGroupId = useCallback((groupId: string | null) => {
+    pendingGroupId = groupId;
+  }, []);
+
+  const setPlannerTaskId = useCallback((taskId: string | null) => {
+    pendingPlannerTaskId = taskId;
+    setPlannerTaskIdState(taskId);
   }, []);
 
   // Timer tick effect
@@ -229,6 +266,8 @@ export function useTimer() {
     formattedTime: formatTime(getDisplayTime()),
     isOvertime: isOvertime(),
     countdownComplete,
+    notes,
+    plannerTaskId,
     start,
     pause,
     resume,
@@ -239,6 +278,9 @@ export function useTimer() {
     setDuration,
     setTaskName,
     setProjectIds,
+    setGroupId,
+    setPlannerTaskId,
+    setNotes,
     formatTime,
   };
 }

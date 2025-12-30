@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { X, Pause, Play, Square, Timer, Hourglass } from 'lucide-react';
+import { X, Pause, Play, Square, Timer, Hourglass, FolderOpen, Check, StickyNote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TimerState, TimerMode, Project } from '@/types';
 import { cn } from '@/lib/utils';
@@ -8,11 +8,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { RichTextEditor } from '@/components/notes/RichTextEditor';
 
 interface FocusViewProps {
   taskName: string;
   onTaskNameChange: (name: string) => void;
   projectIds: string[];
+  onProjectChange: (ids: string[]) => void;
   projects: Project[];
   mode: TimerMode;
   onModeChange: (mode: TimerMode) => void;
@@ -22,6 +24,8 @@ interface FocusViewProps {
   duration: number;
   onDurationChange: (duration: number) => void;
   elapsed: number;
+  notes: string;
+  onNotesChange: (notes: string) => void;
   onStart: () => void;
   onPause: () => void;
   onResume: () => void;
@@ -33,6 +37,7 @@ export function FocusView({
   taskName,
   onTaskNameChange,
   projectIds,
+  onProjectChange,
   projects,
   mode,
   onModeChange,
@@ -42,6 +47,8 @@ export function FocusView({
   duration,
   onDurationChange,
   elapsed,
+  notes,
+  onNotesChange,
   onStart,
   onPause,
   onResume,
@@ -51,6 +58,7 @@ export function FocusView({
   const [isEditingDuration, setIsEditingDuration] = useState(false);
   const [durationInput, setDurationInput] = useState('');
   const [showStopConfirm, setShowStopConfirm] = useState(false);
+  const [showNotesPanel, setShowNotesPanel] = useState(false);
   const durationInputRef = useRef<HTMLInputElement>(null);
 
   const getProjectById = (id: string) => projects.find(p => p.id === id);
@@ -116,47 +124,88 @@ export function FocusView({
   };
 
   return (
-    <div className="fixed inset-0 bg-background z-50 flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between px-8 py-6 border-b border-border">
-        <div className="flex items-center gap-3">
-          {selectedProject && (
-            <span
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium"
-              style={{
-                backgroundColor: `${selectedProject.color}18`,
-                color: selectedProject.color,
-              }}
-            >
-              <span
-                className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: selectedProject.color }}
-              />
-              {selectedProject.name}
-            </span>
-          )}
-          {state !== 'idle' && (
-            <h1 className="text-xl font-semibold text-foreground">
-              {taskName || 'Focus Session'}
-            </h1>
-          )}
+    <div className="fixed inset-0 bg-background z-50 flex">
+      {/* Main Timer Section */}
+      <div className={cn(
+        "flex-1 flex flex-col transition-all duration-300",
+        showNotesPanel && "mr-[50%]"
+      )}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-8 py-6 border-b border-border">
+          <div className="flex items-center gap-3">
+            {/* Project Selector */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border hover:bg-muted/50 transition-colors text-sm">
+                  {selectedProject ? (
+                    <>
+                      <span
+                        className="w-2.5 h-2.5 rounded-full"
+                        style={{ backgroundColor: selectedProject.color }}
+                      />
+                      <span className="font-medium">{selectedProject.name}</span>
+                    </>
+                  ) : (
+                    <>
+                      <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Project</span>
+                    </>
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-48 p-1" align="start">
+                <div className="text-xs font-medium text-muted-foreground px-2 py-1.5">
+                  Select Project
+                </div>
+                {projects.map((project) => (
+                  <button
+                    key={project.id}
+                    onClick={() => {
+                      if (projectIds.includes(project.id)) {
+                        onProjectChange([]);
+                      } else {
+                        onProjectChange([project.id]);
+                      }
+                    }}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted transition-colors"
+                  >
+                    <span
+                      className="w-2.5 h-2.5 rounded-full"
+                      style={{ backgroundColor: project.color }}
+                    />
+                    <span className="flex-1 text-left">{project.name}</span>
+                    {projectIds.includes(project.id) && (
+                      <Check className="h-3.5 w-3.5 text-primary" />
+                    )}
+                  </button>
+                ))}
+                {projects.length === 0 && (
+                  <p className="text-xs text-muted-foreground px-2 py-1.5">No projects yet</p>
+                )}
+              </PopoverContent>
+            </Popover>
+            {state !== 'idle' && (
+              <h1 className="text-xl font-semibold text-foreground">
+                {taskName || 'Focus Session'}
+              </h1>
+            )}
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onExit}
+            className="gap-2 text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+            Exit Focus
+          </Button>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onExit}
-          className="gap-2 text-muted-foreground hover:text-foreground"
-        >
-          <X className="h-4 w-4" />
-          Exit Focus
-        </Button>
-      </div>
 
       {/* Main Content */}
       <div className="flex-1 flex items-center justify-center">
         <div className="flex flex-col items-center">
-          {/* Task Name Input - Only show when idle */}
-          {state === 'idle' && (
+          {/* Task Name - Input when idle, Display when running/paused */}
+          {state === 'idle' ? (
             <input
               type="text"
               value={taskName}
@@ -164,6 +213,10 @@ export function FocusView({
               placeholder="What are you working on?"
               className="text-base text-foreground bg-muted/30 border border-border rounded-lg px-4 py-2.5 w-[320px] text-center focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary placeholder:text-muted-foreground/60 transition-all mb-6"
             />
+          ) : (
+            <p className="text-base font-medium text-foreground mb-6 w-[320px] text-center">
+              {taskName || 'Focus Session'}
+            </p>
           )}
 
           {/* Mode Toggle - Only show when idle */}
@@ -364,16 +417,59 @@ export function FocusView({
                 </PopoverContent>
               </Popover>
             )}
+
+            {/* Notes Button */}
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => setShowNotesPanel(!showNotesPanel)}
+              className={cn(
+                "h-14 px-6 gap-2",
+                showNotesPanel && "bg-muted"
+              )}
+            >
+              <StickyNote className="h-5 w-5" />
+              Notes
+            </Button>
           </div>
 
           {/* Status */}
-          <p className="text-sm text-muted-foreground mt-6">
+          <p className="text-sm text-muted-foreground mt-2">
             {state === 'idle'
               ? 'Configure your focus session above'
               : state === 'running'
                 ? 'Focus in progress...'
                 : 'Paused'}
           </p>
+        </div>
+      </div>
+      </div>
+
+      {/* Notes Panel - Takes up right half of the screen */}
+      <div className={cn(
+        "fixed top-0 right-0 h-full w-1/2 bg-card border-l border-border flex flex-col transition-transform duration-300 z-50",
+        showNotesPanel ? "translate-x-0" : "translate-x-full"
+      )}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border flex-shrink-0">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <StickyNote className="h-5 w-5" />
+            Session Notes
+          </h2>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowNotesPanel(false)}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="flex-1 p-6 overflow-hidden flex flex-col">
+          <RichTextEditor
+            content={notes}
+            onChange={onNotesChange}
+            placeholder="Capture your thoughts, to-dos, or ideas..."
+            className="flex-1 h-full"
+          />
         </div>
       </div>
     </div>

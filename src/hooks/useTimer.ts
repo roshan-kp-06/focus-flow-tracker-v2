@@ -2,20 +2,81 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { TimerConfig, TimerMode, TimerState, WorkSession } from '@/types';
 import { addSession } from '@/lib/storage';
 
+const TIMER_STORAGE_KEY = 'focus-flow-timer';
+
+interface StoredTimerState {
+  config: TimerConfig;
+  startTime: string | null;
+  lastUpdateTime: string | null;
+}
+
 const initialConfig: TimerConfig = {
-  mode: 'countdown',
-  duration: 60 * 60, // 1 hour default
+  mode: 'stopwatch',
+  duration: 0,
   elapsed: 0,
   state: 'idle',
   taskName: '',
   projectIds: [],
 };
 
+function loadTimerState(): { config: TimerConfig; startTime: string | null } {
+  try {
+    const stored = localStorage.getItem(TIMER_STORAGE_KEY);
+    if (stored) {
+      const parsed: StoredTimerState = JSON.parse(stored);
+
+      // If timer was running, recalculate elapsed time
+      if (parsed.config.state === 'running' && parsed.startTime && parsed.lastUpdateTime) {
+        const lastUpdate = new Date(parsed.lastUpdateTime).getTime();
+        const now = Date.now();
+        const additionalSeconds = Math.floor((now - lastUpdate) / 1000);
+        parsed.config.elapsed += additionalSeconds;
+      }
+
+      return {
+        config: parsed.config,
+        startTime: parsed.startTime,
+      };
+    }
+  } catch {
+    // Ignore parse errors
+  }
+  return { config: initialConfig, startTime: null };
+}
+
+function saveTimerState(config: TimerConfig, startTime: string | null) {
+  const state: StoredTimerState = {
+    config,
+    startTime,
+    lastUpdateTime: new Date().toISOString(),
+  };
+  localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify(state));
+}
+
+function clearTimerState() {
+  localStorage.removeItem(TIMER_STORAGE_KEY);
+}
+
 export function useTimer() {
-  const [config, setConfig] = useState<TimerConfig>(initialConfig);
+  const [config, setConfig] = useState<TimerConfig>(() => loadTimerState().config);
   const [countdownComplete, setCountdownComplete] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const startTimeRef = useRef<string | null>(null);
+  const startTimeRef = useRef<string | null>(() => loadTimerState().startTime);
+
+  // Initialize startTimeRef from localStorage
+  useEffect(() => {
+    const { startTime } = loadTimerState();
+    startTimeRef.current = startTime;
+  }, []);
+
+  // Save timer state whenever config changes
+  useEffect(() => {
+    if (config.state === 'idle' && config.taskName === '' && config.projectIds.length === 0) {
+      clearTimerState();
+    } else {
+      saveTimerState(config, startTimeRef.current);
+    }
+  }, [config]);
 
   const clearTimerInterval = useCallback(() => {
     if (intervalRef.current) {
@@ -88,7 +149,10 @@ export function useTimer() {
       ...prev,
       elapsed: 0,
       state: 'idle',
+      taskName: '',
+      projectIds: [],
     }));
+    clearTimerState();
   }, [config.elapsed, config.taskName, config.projectIds, clearTimerInterval]);
 
   const reset = useCallback(() => {
@@ -100,6 +164,20 @@ export function useTimer() {
       elapsed: 0,
       state: 'idle',
     }));
+  }, [clearTimerInterval]);
+
+  const discard = useCallback(() => {
+    clearTimerInterval();
+    startTimeRef.current = null;
+    setCountdownComplete(false);
+    setConfig(prev => ({
+      ...prev,
+      elapsed: 0,
+      state: 'idle',
+      taskName: '',
+      projectIds: [],
+    }));
+    clearTimerState();
   }, [clearTimerInterval]);
 
   const setMode = useCallback((mode: TimerMode) => {
@@ -156,6 +234,7 @@ export function useTimer() {
     resume,
     stop,
     reset,
+    discard,
     setMode,
     setDuration,
     setTaskName,

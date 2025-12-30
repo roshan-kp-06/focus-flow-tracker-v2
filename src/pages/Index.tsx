@@ -23,11 +23,10 @@ const Index = () => {
   const timer = useTimer();
   const sessions = useWorkSessions();
 
-  // Refresh sessions when timer stops and exit focus mode
+  // Refresh sessions when timer stops
   useEffect(() => {
     if (timer.config.state === 'idle') {
       sessions.refresh();
-      setIsFocusMode(false);
     }
   }, [timer.config.state]);
 
@@ -39,7 +38,7 @@ const Index = () => {
   const handleContinueSession = (session: WorkSession) => {
     timer.setTaskName(session.taskName);
     timer.setProjectIds(session.projectIds);
-    timer.start();
+    // Don't auto-start - just populate the task info and let user configure & start
   };
 
   return (
@@ -71,6 +70,7 @@ const Index = () => {
                 onResume={timer.resume}
                 onStop={timer.stop}
                 onEnterFocus={() => setIsFocusMode(true)}
+                onDiscard={timer.discard}
               />
 
               {/* View Toggle & Week Stats */}
@@ -165,17 +165,21 @@ const Index = () => {
       </main>
 
       {/* Focus View Overlay */}
-      {isFocusMode && timer.config.state !== 'idle' && (
+      {isFocusMode && (
         <FocusView
           taskName={timer.config.taskName}
+          onTaskNameChange={timer.setTaskName}
           projectIds={timer.config.projectIds}
           projects={sessions.projects}
           mode={timer.config.mode}
+          onModeChange={timer.setMode}
           formattedTime={timer.formattedTime}
           state={timer.config.state}
           isOvertime={timer.isOvertime}
           duration={timer.config.duration}
+          onDurationChange={timer.setDuration}
           elapsed={timer.config.elapsed}
+          onStart={timer.start}
           onPause={timer.pause}
           onResume={timer.resume}
           onStop={handleStopAndExitFocus}

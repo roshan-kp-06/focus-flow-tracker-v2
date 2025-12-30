@@ -5,12 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useState } from 'react';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -35,6 +29,8 @@ export function SessionList({
 }: SessionListProps) {
   const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set());
   const [filterProjectId, setFilterProjectId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [bulkDeleteConfirmDate, setBulkDeleteConfirmDate] = useState<string | null>(null);
 
   const formatDuration = (seconds: number) => {
     const hrs = Math.floor(seconds / 3600);
@@ -251,15 +247,46 @@ export function SessionList({
                       </span>
                     )}
                     {daySelectedCount > 0 && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-xs gap-1.5 text-destructive hover:text-destructive ml-2"
-                        onClick={handleBulkDelete}
+                      <Popover
+                        open={bulkDeleteConfirmDate === date}
+                        onOpenChange={(open) => setBulkDeleteConfirmDate(open ? date : null)}
                       >
-                        <Trash2 className="h-3 w-3" />
-                        Delete
-                      </Button>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs gap-1.5 text-destructive hover:text-destructive ml-2"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            Delete
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-56 p-3" align="start">
+                          <p className="text-sm font-medium mb-2">Delete {daySelectedCount} session{daySelectedCount > 1 ? 's' : ''}?</p>
+                          <p className="text-xs text-muted-foreground mb-3">This action cannot be undone.</p>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1 h-8"
+                              onClick={() => setBulkDeleteConfirmDate(null)}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="flex-1 h-8"
+                              onClick={() => {
+                                handleBulkDelete();
+                                setBulkDeleteConfirmDate(null);
+                              }}
+                            >
+                              Delete
+                            </Button>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     )}
                   </div>
                   <div className="flex items-center gap-3">
@@ -431,22 +458,53 @@ export function SessionList({
                       </Button>
 
                       {/* More Actions */}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
+                      <Popover
+                        open={deleteConfirmId === session.id}
+                        onOpenChange={(open) => setDeleteConfirmId(open ? session.id : null)}
+                      >
+                        <PopoverTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-8 w-8">
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => onDeleteSession(session.id)}
-                            className="text-destructive focus:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-48 p-1" align="end">
+                          {deleteConfirmId !== session.id ? (
+                            <button
+                              onClick={() => setDeleteConfirmId(session.id)}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded hover:bg-destructive/10 text-destructive transition-colors"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              Delete Session
+                            </button>
+                          ) : (
+                            <div className="p-2">
+                              <p className="text-sm font-medium mb-2">Delete this session?</p>
+                              <p className="text-xs text-muted-foreground mb-3">This action cannot be undone.</p>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="flex-1 h-8"
+                                  onClick={() => setDeleteConfirmId(null)}
+                                >
+                                  Cancel
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="flex-1 h-8"
+                                  onClick={() => {
+                                    onDeleteSession(session.id);
+                                    setDeleteConfirmId(null);
+                                  }}
+                                >
+                                  Delete
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   ))}
                 </div>

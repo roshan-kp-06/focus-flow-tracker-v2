@@ -1,4 +1,5 @@
-import { Play, Square, Pause, Clock, Timer, Hourglass, Check, FolderOpen, Maximize2 } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Play, Square, Pause, Clock, Timer, Hourglass, Check, FolderOpen, Maximize2, MoreVertical, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { TimerState, Project, TimerMode } from '@/types';
@@ -27,6 +28,7 @@ interface TimerBarProps {
   onResume: () => void;
   onStop: () => void;
   onEnterFocus?: () => void;
+  onDiscard?: () => void;
 }
 
 export function TimerBar({
@@ -47,48 +49,49 @@ export function TimerBar({
   onResume,
   onStop,
   onEnterFocus,
+  onDiscard,
 }: TimerBarProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+  const [showStopConfirm, setShowStopConfirm] = useState(false);
+  const [isEditingDuration, setIsEditingDuration] = useState(false);
+  const [durationInput, setDurationInput] = useState('');
+  const durationInputRef = useRef<HTMLInputElement>(null);
+
   const getProjectById = (id: string) => projects.find(p => p.id === id);
   const selectedProject = selectedProjectIds.length > 0 ? getProjectById(selectedProjectIds[0]) : null;
-  const handleDurationInput = (value: string) => {
-    const input = value.toLowerCase().trim();
+
+  // Focus input when entering edit mode
+  useEffect(() => {
+    if (isEditingDuration && durationInputRef.current) {
+      durationInputRef.current.focus();
+    }
+  }, [isEditingDuration]);
+
+  const handleDurationSubmit = () => {
+    const input = durationInput.toLowerCase().trim();
     let totalSeconds = 0;
 
-    // Try parsing natural language formats
-    // Match patterns like "2 hours", "2h", "90 minutes", "90m", "1h 30m", "1:30", "01:30:00"
-
-    // Pattern: HH:MM:SS or HH:MM or MM
     const colonParts = input.split(':').map(p => parseInt(p) || 0);
     if (colonParts.length === 3) {
       totalSeconds = colonParts[0] * 3600 + colonParts[1] * 60 + colonParts[2];
     } else if (colonParts.length === 2) {
-      totalSeconds = colonParts[0] * 3600 + colonParts[1] * 60; // Treat as HH:MM
+      totalSeconds = colonParts[0] * 3600 + colonParts[1] * 60;
     } else if (colonParts.length === 1 && !input.match(/[a-z]/)) {
-      // Just a number - treat as minutes
       totalSeconds = colonParts[0] * 60;
     } else {
-      // Try natural language parsing
       let hours = 0;
       let minutes = 0;
       let seconds = 0;
 
-      // Match hours: "2 hours", "2h", "2 hr", "2hrs"
       const hourMatch = input.match(/(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h)\b/);
-      if (hourMatch) {
-        hours = parseFloat(hourMatch[1]);
-      }
+      if (hourMatch) hours = parseFloat(hourMatch[1]);
 
-      // Match minutes: "30 minutes", "30m", "30 min", "30mins"
       const minMatch = input.match(/(\d+(?:\.\d+)?)\s*(?:minutes?|mins?|m)\b/);
-      if (minMatch) {
-        minutes = parseFloat(minMatch[1]);
-      }
+      if (minMatch) minutes = parseFloat(minMatch[1]);
 
-      // Match seconds: "30 seconds", "30s", "30 sec", "30secs"
       const secMatch = input.match(/(\d+(?:\.\d+)?)\s*(?:seconds?|secs?|s)\b/);
-      if (secMatch) {
-        seconds = parseFloat(secMatch[1]);
-      }
+      if (secMatch) seconds = parseFloat(secMatch[1]);
 
       totalSeconds = Math.round(hours * 3600 + minutes * 60 + seconds);
     }
@@ -96,14 +99,17 @@ export function TimerBar({
     if (totalSeconds > 0) {
       onDurationChange(totalSeconds);
     }
+    setDurationInput('');
+    setIsEditingDuration(false);
   };
 
-  const formatDurationInput = (seconds: number) => {
+  const formatDurationDisplay = (seconds: number) => {
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
     return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
+
 
   return (
     <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
@@ -166,8 +172,8 @@ export function TimerBar({
           </PopoverContent>
         </Popover>
 
-        {/* Focus View Button - only show when timer is running or paused */}
-        {state !== 'idle' && onEnterFocus && (
+        {/* Focus View Button */}
+        {onEnterFocus && (
           <button
             onClick={onEnterFocus}
             className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border hover:bg-muted/50 transition-colors text-sm text-muted-foreground hover:text-foreground"
@@ -216,15 +222,35 @@ export function TimerBar({
         <div className="h-8 w-px bg-border" />
 
         {/* Timer Display - Fixed width to prevent layout shift */}
-        <div className="flex items-center gap-2 w-[120px]">
+        <div className="flex items-center gap-2 w-[140px]">
           <Clock className={cn("h-4 w-4 flex-shrink-0", isOvertime ? "text-orange-500" : "text-muted-foreground")} />
-          {state === 'idle' && mode === 'countdown' ? (
+          {state === 'idle' && mode === 'countdown' && isEditingDuration ? (
             <input
+              ref={durationInputRef}
               type="text"
-              onBlur={(e) => handleDurationInput(e.target.value)}
-              className="w-full text-center font-semibold text-base border border-transparent rounded-lg bg-transparent hover:bg-muted/50 focus:bg-background focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary tabular-nums px-2 py-1 transition-all cursor-pointer"
-              placeholder="1h 30m"
+              value={durationInput}
+              onChange={(e) => setDurationInput(e.target.value)}
+              onBlur={handleDurationSubmit}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleDurationSubmit();
+                } else if (e.key === 'Escape') {
+                  setDurationInput('');
+                  setIsEditingDuration(false);
+                }
+              }}
+              className="w-full text-center font-semibold text-base border border-primary rounded-lg bg-background focus:outline-none focus:ring-1 focus:ring-primary tabular-nums px-2 py-1 transition-all"
+              placeholder="2h, 90m..."
             />
+          ) : state === 'idle' && mode === 'countdown' ? (
+            <button
+              onClick={() => setIsEditingDuration(true)}
+              className="w-full text-center font-semibold text-base tabular-nums px-2 py-1 rounded-lg hover:bg-muted/50 transition-all cursor-text"
+            >
+              {duration > 0 ? formatDurationDisplay(duration) : (
+                <span className="text-muted-foreground">Set time</span>
+              )}
+            </button>
           ) : (
             <span className={cn(
               'font-semibold text-base tabular-nums w-full text-center',
@@ -262,13 +288,40 @@ export function TimerBar({
               >
                 <Pause className="h-4 w-4" />
               </Button>
-              <Button
-                onClick={onStop}
-                variant="destructive"
-                className="h-10 w-10 p-0 rounded-full"
-              >
-                <Square className="h-4 w-4 fill-current" />
-              </Button>
+              <Popover open={showStopConfirm} onOpenChange={setShowStopConfirm}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="destructive"
+                    className="h-10 w-10 p-0 rounded-full"
+                  >
+                    <Square className="h-4 w-4 fill-current" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-48 p-2" align="center">
+                  <p className="text-sm font-medium mb-2 text-center">Finish this task?</p>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 h-8"
+                      onClick={() => setShowStopConfirm(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="flex-1 h-8"
+                      onClick={() => {
+                        onStop();
+                        setShowStopConfirm(false);
+                      }}
+                    >
+                      Finish
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </>
           )}
 
@@ -281,16 +334,99 @@ export function TimerBar({
               >
                 <Play className="h-4 w-4" />
               </Button>
-              <Button
-                onClick={onStop}
-                variant="destructive"
-                className="h-10 w-10 p-0 rounded-full"
-              >
-                <Square className="h-4 w-4 fill-current" />
-              </Button>
+              <Popover open={showStopConfirm} onOpenChange={setShowStopConfirm}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="destructive"
+                    className="h-10 w-10 p-0 rounded-full"
+                  >
+                    <Square className="h-4 w-4 fill-current" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-48 p-2" align="center">
+                  <p className="text-sm font-medium mb-2 text-center">Finish this task?</p>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 h-8"
+                      onClick={() => setShowStopConfirm(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="flex-1 h-8"
+                      onClick={() => {
+                        onStop();
+                        setShowStopConfirm(false);
+                      }}
+                    >
+                      Finish
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </>
           )}
         </div>
+
+        {/* More Options Menu */}
+        <Popover
+          open={menuOpen}
+          onOpenChange={(open) => {
+            setMenuOpen(open);
+            if (!open) setShowDiscardConfirm(false);
+          }}
+        >
+          <PopoverTrigger asChild>
+            <button className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground">
+              <MoreVertical className="h-4 w-4" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-48 p-1" align="end">
+            {!showDiscardConfirm ? (
+              <button
+                onClick={() => setShowDiscardConfirm(true)}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded hover:bg-destructive/10 text-destructive transition-colors"
+              >
+                <Trash2 className="h-4 w-4" />
+                Discard Task
+              </button>
+            ) : (
+              <div className="p-2">
+                <p className="text-sm font-medium mb-2">Discard this task?</p>
+                <p className="text-xs text-muted-foreground mb-3">This will clear the current task without saving.</p>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1 h-8"
+                    onClick={() => {
+                      setShowDiscardConfirm(false);
+                      setMenuOpen(false);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="flex-1 h-8"
+                    onClick={() => {
+                      onDiscard?.();
+                      setShowDiscardConfirm(false);
+                      setMenuOpen(false);
+                    }}
+                  >
+                    Discard
+                  </Button>
+                </div>
+              </div>
+            )}
+          </PopoverContent>
+        </Popover>
       </div>
     </div>
   );

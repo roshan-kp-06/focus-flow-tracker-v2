@@ -116,7 +116,7 @@ export function TimerBar({
             <Input
               defaultValue={formatDurationInput(duration)}
               onBlur={(e) => handleDurationInput(e.target.value)}
-              className="w-24 text-center font-semibold text-base border-0 shadow-none bg-transparent focus-visible:ring-0 p-0 tabular-nums"
+              className="w-[5.5rem] text-center font-semibold text-base border-0 shadow-none bg-transparent focus-visible:ring-0 p-0 tabular-nums h-auto"
               placeholder="00:25:00"
             />
           ) : (

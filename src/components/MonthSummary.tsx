@@ -21,7 +21,7 @@ export function MonthSummary({ monthTotal, weekTotal, sessionCount }: MonthSumma
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-      <div className="glass-card rounded-xl p-5">
+      <div className="bg-card border border-border rounded-lg p-5">
         <div className="flex items-center gap-3 mb-3">
           <div className="p-2.5 rounded-lg bg-primary/10">
             <Calendar className="h-5 w-5 text-primary" />
@@ -38,10 +38,10 @@ export function MonthSummary({ monthTotal, weekTotal, sessionCount }: MonthSumma
         </p>
       </div>
 
-      <div className="glass-card rounded-xl p-5">
+      <div className="bg-card border border-border rounded-lg p-5">
         <div className="flex items-center gap-3 mb-3">
-          <div className="p-2.5 rounded-lg bg-accent/10">
-            <Clock className="h-5 w-5 text-accent" />
+          <div className="p-2.5 rounded-lg bg-primary/10">
+            <Clock className="h-5 w-5 text-primary" />
           </div>
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             This Week
@@ -55,7 +55,7 @@ export function MonthSummary({ monthTotal, weekTotal, sessionCount }: MonthSumma
         </p>
       </div>
 
-      <div className="glass-card rounded-xl p-5">
+      <div className="bg-card border border-border rounded-lg p-5">
         <div className="flex items-center gap-3 mb-3">
           <div className="p-2.5 rounded-lg bg-success/10">
             <Target className="h-5 w-5 text-success" />

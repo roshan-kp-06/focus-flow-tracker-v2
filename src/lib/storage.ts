@@ -5,10 +5,10 @@ const SESSIONS_KEY = 'deepwork_sessions';
 
 // Default projects
 const defaultProjects: Project[] = [
-  { id: '1', name: 'Development', color: 'hsl(32, 95%, 55%)' },
-  { id: '2', name: 'Design', color: 'hsl(175, 60%, 45%)' },
-  { id: '3', name: 'Research', color: 'hsl(280, 65%, 60%)' },
-  { id: '4', name: 'Writing', color: 'hsl(200, 80%, 55%)' },
+  { id: '1', name: 'Development', color: 'hsl(199, 89%, 58%)' },
+  { id: '2', name: 'Design', color: 'hsl(262, 52%, 63%)' },
+  { id: '3', name: 'Research', color: 'hsl(158, 64%, 52%)' },
+  { id: '4', name: 'Writing', color: 'hsl(25, 95%, 66%)' },
 ];
 
 export function getProjects(): Project[] {
@@ -33,6 +33,16 @@ export function addProject(project: Project): Project[] {
   const projects = getProjects();
   projects.push(project);
   saveProjects(projects);
+  return projects;
+}
+
+export function updateProject(projectId: string, name: string, color: string): Project[] {
+  const projects = getProjects();
+  const index = projects.findIndex(p => p.id === projectId);
+  if (index !== -1) {
+    projects[index] = { ...projects[index], name, color };
+    saveProjects(projects);
+  }
   return projects;
 }
 

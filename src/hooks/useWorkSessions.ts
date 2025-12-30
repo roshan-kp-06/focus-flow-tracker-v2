@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { WorkSession, Project } from '@/types';
-import { getSessions, getProjects, addProject, deleteProject, deleteSession } from '@/lib/storage';
+import { getSessions, getProjects, addProject, updateProject, deleteProject, deleteSession } from '@/lib/storage';
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, format, eachDayOfInterval, parseISO, isWithinInterval } from 'date-fns';
 
 export function useWorkSessions() {
@@ -25,6 +25,11 @@ export function useWorkSessions() {
     const updated = addProject(project);
     setProjects(updated);
     return project;
+  }, []);
+
+  const editProject = useCallback((projectId: string, name: string, color: string) => {
+    const updated = updateProject(projectId, name, color);
+    setProjects(updated);
   }, []);
 
   const removeProject = useCallback((projectId: string) => {
@@ -131,6 +136,7 @@ export function useWorkSessions() {
     projects,
     refresh,
     createProject,
+    editProject,
     removeProject,
     removeSession,
     getTodaySessions,

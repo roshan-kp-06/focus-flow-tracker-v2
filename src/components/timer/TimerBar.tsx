@@ -39,15 +39,48 @@ export function TimerBar({
   onStop,
 }: TimerBarProps) {
   const handleDurationInput = (value: string) => {
-    const parts = value.split(':').map(p => parseInt(p) || 0);
+    const input = value.toLowerCase().trim();
     let totalSeconds = 0;
-    if (parts.length === 3) {
-      totalSeconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
-    } else if (parts.length === 2) {
-      totalSeconds = parts[0] * 60 + parts[1];
-    } else if (parts.length === 1) {
-      totalSeconds = parts[0] * 60;
+
+    // Try parsing natural language formats
+    // Match patterns like "2 hours", "2h", "90 minutes", "90m", "1h 30m", "1:30", "01:30:00"
+
+    // Pattern: HH:MM:SS or HH:MM or MM
+    const colonParts = input.split(':').map(p => parseInt(p) || 0);
+    if (colonParts.length === 3) {
+      totalSeconds = colonParts[0] * 3600 + colonParts[1] * 60 + colonParts[2];
+    } else if (colonParts.length === 2) {
+      totalSeconds = colonParts[0] * 3600 + colonParts[1] * 60; // Treat as HH:MM
+    } else if (colonParts.length === 1 && !input.match(/[a-z]/)) {
+      // Just a number - treat as minutes
+      totalSeconds = colonParts[0] * 60;
+    } else {
+      // Try natural language parsing
+      let hours = 0;
+      let minutes = 0;
+      let seconds = 0;
+
+      // Match hours: "2 hours", "2h", "2 hr", "2hrs"
+      const hourMatch = input.match(/(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h)\b/);
+      if (hourMatch) {
+        hours = parseFloat(hourMatch[1]);
+      }
+
+      // Match minutes: "30 minutes", "30m", "30 min", "30mins"
+      const minMatch = input.match(/(\d+(?:\.\d+)?)\s*(?:minutes?|mins?|m)\b/);
+      if (minMatch) {
+        minutes = parseFloat(minMatch[1]);
+      }
+
+      // Match seconds: "30 seconds", "30s", "30 sec", "30secs"
+      const secMatch = input.match(/(\d+(?:\.\d+)?)\s*(?:seconds?|secs?|s)\b/);
+      if (secMatch) {
+        seconds = parseFloat(secMatch[1]);
+      }
+
+      totalSeconds = Math.round(hours * 3600 + minutes * 60 + seconds);
     }
+
     if (totalSeconds > 0) {
       onDurationChange(totalSeconds);
     }

@@ -148,7 +148,6 @@ export function TimerBar({
           {state === 'idle' && mode === 'countdown' ? (
             <input
               type="text"
-              defaultValue={formatDurationInput(duration)}
               onBlur={(e) => handleDurationInput(e.target.value)}
               className="w-24 text-center font-semibold text-base border border-transparent rounded-lg bg-transparent hover:bg-muted/50 focus:bg-background focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary tabular-nums px-2 py-1 transition-all cursor-pointer"
               placeholder="1h 30m"

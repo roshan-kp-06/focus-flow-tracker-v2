@@ -330,7 +330,7 @@ export function SessionList({
                           type="text"
                           defaultValue={session.taskName || 'Untitled session'}
                           onBlur={(e) => handleInlineEdit(session.id, 'taskName', e.target.value)}
-                          className="text-sm font-medium text-foreground bg-transparent border-none outline-none w-full hover:bg-muted/50 focus:bg-muted/50 rounded px-1 py-0.5 -ml-1 truncate"
+                          className="text-sm font-medium text-foreground bg-transparent border border-transparent w-full rounded-lg px-2 py-1 -ml-2 truncate transition-all cursor-text hover:bg-muted/50 focus:bg-background focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                         />
                         {session.projectIds.length > 0 && (
                           <p className="text-xs text-muted-foreground mt-0.5 ml-0.5">
@@ -402,14 +402,14 @@ export function SessionList({
                           type="time"
                           defaultValue={formatTimeOnly(session.startTime)}
                           onBlur={(e) => handleTimeEdit(session, 'startTime', e.target.value)}
-                          className="bg-transparent border-none outline-none w-[70px] hover:bg-muted/50 focus:bg-muted/50 rounded px-1 py-0.5 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute"
+                          className="bg-transparent border border-transparent w-[70px] rounded-lg px-1 py-0.5 transition-all cursor-text hover:bg-muted/50 focus:bg-background focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute"
                         />
                         <span>-</span>
                         <input
                           type="time"
                           defaultValue={formatTimeOnly(session.endTime)}
                           onBlur={(e) => handleTimeEdit(session, 'endTime', e.target.value)}
-                          className="bg-transparent border-none outline-none w-[70px] hover:bg-muted/50 focus:bg-muted/50 rounded px-1 py-0.5 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute"
+                          className="bg-transparent border border-transparent w-[70px] rounded-lg px-1 py-0.5 transition-all cursor-text hover:bg-muted/50 focus:bg-background focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute"
                         />
                       </div>
 

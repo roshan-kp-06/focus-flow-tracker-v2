@@ -113,10 +113,11 @@ export function TimerBar({
         <div className="flex items-center gap-2">
           <Clock className={cn("h-4 w-4", isOvertime ? "text-orange-500" : "text-muted-foreground")} />
           {state === 'idle' && mode === 'countdown' ? (
-            <Input
+            <input
+              type="text"
               defaultValue={formatDurationInput(duration)}
               onBlur={(e) => handleDurationInput(e.target.value)}
-              className="w-[5.5rem] text-center font-semibold text-base border-0 shadow-none bg-transparent focus-visible:ring-0 p-0 tabular-nums h-auto"
+              className="w-[5.5rem] text-center font-semibold text-base border-0 bg-transparent focus:outline-none tabular-nums"
               placeholder="00:25:00"
             />
           ) : (

@@ -1,8 +1,13 @@
-import { Play, Square, Pause, Clock, Timer, Hourglass } from 'lucide-react';
+import { Play, Square, Pause, Clock, Timer, Hourglass, Check, X, FolderOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { TimerState, Project, TimerMode } from '@/types';
 import { cn } from '@/lib/utils';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 
 interface TimerBarProps {
   taskName: string;
@@ -26,6 +31,9 @@ interface TimerBarProps {
 export function TimerBar({
   taskName,
   onTaskNameChange,
+  projects,
+  selectedProjectIds,
+  onProjectChange,
   mode,
   onModeChange,
   duration,
@@ -38,6 +46,8 @@ export function TimerBar({
   onResume,
   onStop,
 }: TimerBarProps) {
+  const getProjectById = (id: string) => projects.find(p => p.id === id);
+  const selectedProject = selectedProjectIds.length > 0 ? getProjectById(selectedProjectIds[0]) : null;
   const handleDurationInput = (value: string) => {
     const input = value.toLowerCase().trim();
     let totalSeconds = 0;
@@ -103,6 +113,58 @@ export function TimerBar({
           onChange={(e) => onTaskNameChange(e.target.value)}
           className="flex-1 border border-border rounded-lg bg-background text-sm h-10 px-4 focus-visible:ring-1 focus-visible:ring-primary placeholder:text-muted-foreground"
         />
+
+        {/* Project Selector */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <button className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border hover:bg-muted/50 transition-colors text-sm">
+              {selectedProject ? (
+                <>
+                  <span
+                    className="w-2.5 h-2.5 rounded-full"
+                    style={{ backgroundColor: selectedProject.color }}
+                  />
+                  <span className="font-medium">{selectedProject.name}</span>
+                </>
+              ) : (
+                <>
+                  <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Project</span>
+                </>
+              )}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-48 p-1" align="start">
+            <div className="text-xs font-medium text-muted-foreground px-2 py-1.5">
+              Select Project
+            </div>
+            {selectedProjectIds.length > 0 && (
+              <button
+                onClick={() => onProjectChange([])}
+                className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted transition-colors text-muted-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+                <span className="flex-1 text-left">No project</span>
+              </button>
+            )}
+            {projects.map((project) => (
+              <button
+                key={project.id}
+                onClick={() => onProjectChange([project.id])}
+                className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted transition-colors"
+              >
+                <span
+                  className="w-2.5 h-2.5 rounded-full"
+                  style={{ backgroundColor: project.color }}
+                />
+                <span className="flex-1 text-left">{project.name}</span>
+                {selectedProjectIds.includes(project.id) && (
+                  <Check className="h-3.5 w-3.5 text-primary" />
+                )}
+              </button>
+            ))}
+          </PopoverContent>
+        </Popover>
 
         {/* Divider */}
         <div className="h-8 w-px bg-border" />

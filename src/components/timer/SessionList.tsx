@@ -1,4 +1,4 @@
-import { Clock, Play, MoreHorizontal, Trash2, ListFilter, Check } from 'lucide-react';
+import { Clock, Play, MoreHorizontal, Trash2, ListFilter, Check, X, Pencil } from 'lucide-react';
 import { format, parseISO, startOfWeek, isToday, isYesterday } from 'date-fns';
 import { WorkSession, Project } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,15 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 interface SessionListProps {
   sessions: WorkSession[];
@@ -34,6 +43,54 @@ export function SessionList({
   onUpdateSession,
 }: SessionListProps) {
   const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set());
+  const [editingSession, setEditingSession] = useState<WorkSession | null>(null);
+  const [editTaskName, setEditTaskName] = useState('');
+  const [editStartTime, setEditStartTime] = useState('');
+  const [editEndTime, setEditEndTime] = useState('');
+
+  const openEditDialog = (session: WorkSession) => {
+    setEditingSession(session);
+    setEditTaskName(session.taskName);
+    setEditStartTime(format(parseISO(session.startTime), 'HH:mm'));
+    setEditEndTime(format(parseISO(session.endTime), 'HH:mm'));
+  };
+
+  const saveEditedSession = () => {
+    if (!editingSession || !onUpdateSession) return;
+
+    // Parse times and calculate new duration
+    const [startHour, startMin] = editStartTime.split(':').map(Number);
+    const [endHour, endMin] = editEndTime.split(':').map(Number);
+
+    const baseDate = parseISO(editingSession.startTime);
+    const newStartTime = new Date(baseDate);
+    newStartTime.setHours(startHour, startMin, 0, 0);
+
+    const newEndTime = new Date(baseDate);
+    newEndTime.setHours(endHour, endMin, 0, 0);
+
+    // Handle case where end time is before start (crossed midnight)
+    if (newEndTime < newStartTime) {
+      newEndTime.setDate(newEndTime.getDate() + 1);
+    }
+
+    const newDuration = Math.floor((newEndTime.getTime() - newStartTime.getTime()) / 1000);
+
+    onUpdateSession(editingSession.id, {
+      taskName: editTaskName,
+      startTime: newStartTime.toISOString(),
+      endTime: newEndTime.toISOString(),
+      duration: newDuration,
+    });
+
+    setEditingSession(null);
+  };
+
+  const handleRemoveProject = (sessionId: string) => {
+    if (onUpdateSession) {
+      onUpdateSession(sessionId, { projectIds: [] });
+    }
+  };
 
   const formatDuration = (seconds: number) => {
     const hrs = Math.floor(seconds / 3600);
@@ -251,6 +308,15 @@ export function SessionList({
                             <div className="text-xs font-medium text-muted-foreground px-2 py-1.5">
                               Select Project
                             </div>
+                            {session.projectIds.length > 0 && (
+                              <button
+                                onClick={() => handleRemoveProject(session.id)}
+                                className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted transition-colors text-muted-foreground"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                                <span className="flex-1 text-left">Remove project</span>
+                              </button>
+                            )}
                             {projects.map((project) => (
                               <button
                                 key={project.id}
@@ -305,6 +371,10 @@ export function SessionList({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEditDialog(session)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => onDeleteSession(session.id)}
                             className="text-destructive focus:text-destructive"
@@ -322,6 +392,54 @@ export function SessionList({
           })}
         </div>
       ))}
+
+      {/* Edit Session Dialog */}
+      <Dialog open={!!editingSession} onOpenChange={(open) => !open && setEditingSession(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Session</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="taskName">Task Name</Label>
+              <Input
+                id="taskName"
+                value={editTaskName}
+                onChange={(e) => setEditTaskName(e.target.value)}
+                placeholder="What were you working on?"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="startTime">Start Time</Label>
+                <Input
+                  id="startTime"
+                  type="time"
+                  value={editStartTime}
+                  onChange={(e) => setEditStartTime(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="endTime">End Time</Label>
+                <Input
+                  id="endTime"
+                  type="time"
+                  value={editEndTime}
+                  onChange={(e) => setEditEndTime(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingSession(null)}>
+              Cancel
+            </Button>
+            <Button onClick={saveEditedSession}>
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

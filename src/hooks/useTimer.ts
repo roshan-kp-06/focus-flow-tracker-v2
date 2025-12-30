@@ -6,8 +6,9 @@ const TIMER_STORAGE_KEY = 'focus-flow-timer';
 
 interface StoredTimerState {
   config: TimerConfig;
-  startTime: string | null;
-  lastUpdateTime: string | null;
+  startTime: string | null; // Current running segment start (null when paused)
+  sessionStartTime: string | null; // Original session start (for the WorkSession record)
+  pausedElapsed: number; // Time elapsed before pause (for pause/resume)
   notes?: string;
 }
 
@@ -23,37 +24,40 @@ const initialConfig: TimerConfig = {
 // Track the groupId for sub-sessions (Continue feature)
 let pendingGroupId: string | null = null;
 
-function loadTimerState(): { config: TimerConfig; startTime: string | null; notes: string } {
+function loadTimerState(): { config: TimerConfig; startTime: string | null; sessionStartTime: string | null; pausedElapsed: number; notes: string } {
   try {
     const stored = localStorage.getItem(TIMER_STORAGE_KEY);
     if (stored) {
       const parsed: StoredTimerState = JSON.parse(stored);
 
-      // If timer was running, recalculate elapsed time
-      if (parsed.config.state === 'running' && parsed.startTime && parsed.lastUpdateTime) {
-        const lastUpdate = new Date(parsed.lastUpdateTime).getTime();
+      // If timer was running, recalculate elapsed time from start time
+      if (parsed.config.state === 'running' && parsed.startTime) {
+        const startMs = new Date(parsed.startTime).getTime();
         const now = Date.now();
-        const additionalSeconds = Math.floor((now - lastUpdate) / 1000);
-        parsed.config.elapsed += additionalSeconds;
+        const totalElapsed = (parsed.pausedElapsed || 0) + Math.floor((now - startMs) / 1000);
+        parsed.config.elapsed = totalElapsed;
       }
 
       return {
         config: parsed.config,
         startTime: parsed.startTime,
+        sessionStartTime: parsed.sessionStartTime || parsed.startTime, // fallback for old data
+        pausedElapsed: parsed.pausedElapsed || 0,
         notes: parsed.notes || '',
       };
     }
   } catch {
     // Ignore parse errors
   }
-  return { config: initialConfig, startTime: null, notes: '' };
+  return { config: initialConfig, startTime: null, sessionStartTime: null, pausedElapsed: 0, notes: '' };
 }
 
-function saveTimerState(config: TimerConfig, startTime: string | null, notes: string) {
+function saveTimerState(config: TimerConfig, startTime: string | null, sessionStartTime: string | null, pausedElapsed: number, notes: string) {
   const state: StoredTimerState = {
     config,
     startTime,
-    lastUpdateTime: new Date().toISOString(),
+    sessionStartTime,
+    pausedElapsed,
     notes,
   };
   localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify(state));
@@ -64,16 +68,21 @@ function clearTimerState() {
 }
 
 export function useTimer() {
-  const [config, setConfig] = useState<TimerConfig>(() => loadTimerState().config);
-  const [notes, setNotes] = useState<string>(() => loadTimerState().notes);
+  const initialState = loadTimerState();
+  const [config, setConfig] = useState<TimerConfig>(initialState.config);
+  const [notes, setNotes] = useState<string>(initialState.notes);
   const [countdownComplete, setCountdownComplete] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const startTimeRef = useRef<string | null>(() => loadTimerState().startTime);
+  const startTimeRef = useRef<string | null>(initialState.startTime);
+  const pausedElapsedRef = useRef<number>(initialState.pausedElapsed);
+  const sessionStartTimeRef = useRef<string | null>(initialState.sessionStartTime);
 
-  // Initialize startTimeRef and notes from localStorage
+  // Initialize refs from localStorage
   useEffect(() => {
-    const { startTime, notes: storedNotes } = loadTimerState();
+    const { startTime, sessionStartTime, pausedElapsed, notes: storedNotes } = loadTimerState();
     startTimeRef.current = startTime;
+    sessionStartTimeRef.current = sessionStartTime;
+    pausedElapsedRef.current = pausedElapsed;
     if (storedNotes) setNotes(storedNotes);
   }, []);
 
@@ -82,7 +91,7 @@ export function useTimer() {
     if (config.state === 'idle' && config.taskName === '' && config.projectIds.length === 0 && !notes) {
       clearTimerState();
     } else {
-      saveTimerState(config, startTimeRef.current, notes);
+      saveTimerState(config, startTimeRef.current, sessionStartTimeRef.current, pausedElapsedRef.current, notes);
     }
   }, [config, notes]);
 
@@ -92,6 +101,16 @@ export function useTimer() {
       intervalRef.current = null;
     }
   }, []);
+
+  // Calculate elapsed time from actual timestamps (works even when tab is hidden)
+  const calculateElapsed = useCallback(() => {
+    if (config.state === 'running' && startTimeRef.current) {
+      const startMs = new Date(startTimeRef.current).getTime();
+      const now = Date.now();
+      return pausedElapsedRef.current + Math.floor((now - startMs) / 1000);
+    }
+    return config.elapsed;
+  }, [config.state, config.elapsed]);
 
   const getDisplayTime = useCallback(() => {
     if (config.mode === 'countdown') {
@@ -119,33 +138,48 @@ export function useTimer() {
 
   const start = useCallback(() => {
     if (config.state === 'idle') {
-      startTimeRef.current = new Date().toISOString();
+      const now = new Date().toISOString();
+      startTimeRef.current = now;
+      sessionStartTimeRef.current = now;
+      pausedElapsedRef.current = 0;
       setCountdownComplete(false);
     }
     setConfig(prev => ({ ...prev, state: 'running' }));
   }, [config.state]);
 
   const pause = useCallback(() => {
-    setConfig(prev => ({ ...prev, state: 'paused' }));
+    // When pausing, calculate the elapsed time and store it
+    if (startTimeRef.current) {
+      const startMs = new Date(startTimeRef.current).getTime();
+      const now = Date.now();
+      pausedElapsedRef.current = pausedElapsedRef.current + Math.floor((now - startMs) / 1000);
+    }
+    startTimeRef.current = null; // Clear the running start time
+    setConfig(prev => ({ ...prev, state: 'paused', elapsed: pausedElapsedRef.current }));
   }, []);
 
   const resume = useCallback(() => {
+    // When resuming, set a new start time (pausedElapsed already has previous time)
+    startTimeRef.current = new Date().toISOString();
     setConfig(prev => ({ ...prev, state: 'running' }));
   }, []);
 
   const stop = useCallback(() => {
     clearTimerInterval();
 
+    // Calculate final elapsed time
+    const finalElapsed = calculateElapsed();
+
     // Save session if there was any elapsed time
-    if (config.elapsed > 0 && startTimeRef.current) {
+    if (finalElapsed > 0 && sessionStartTimeRef.current) {
       const now = new Date();
       const session: WorkSession = {
         id: crypto.randomUUID(),
         taskName: config.taskName || 'Untitled Session',
         projectIds: config.projectIds,
         date: now.toISOString().split('T')[0],
-        duration: config.elapsed,
-        startTime: startTimeRef.current,
+        duration: finalElapsed,
+        startTime: sessionStartTimeRef.current,
         endTime: now.toISOString(),
         groupId: pendingGroupId || undefined,
         notes: notes || undefined,
@@ -154,6 +188,8 @@ export function useTimer() {
     }
 
     startTimeRef.current = null;
+    sessionStartTimeRef.current = null;
+    pausedElapsedRef.current = 0;
     pendingGroupId = null;
     setCountdownComplete(false);
     setNotes('');
@@ -165,11 +201,13 @@ export function useTimer() {
       projectIds: [],
     }));
     clearTimerState();
-  }, [config.elapsed, config.taskName, config.projectIds, notes, clearTimerInterval]);
+  }, [config.taskName, config.projectIds, notes, clearTimerInterval, calculateElapsed]);
 
   const reset = useCallback(() => {
     clearTimerInterval();
     startTimeRef.current = null;
+    sessionStartTimeRef.current = null;
+    pausedElapsedRef.current = 0;
     setCountdownComplete(false);
     setNotes('');
     setConfig(prev => ({
@@ -182,6 +220,8 @@ export function useTimer() {
   const discard = useCallback(() => {
     clearTimerInterval();
     startTimeRef.current = null;
+    sessionStartTimeRef.current = null;
+    pausedElapsedRef.current = 0;
     setCountdownComplete(false);
     setNotes('');
     setConfig(prev => ({
@@ -218,22 +258,44 @@ export function useTimer() {
     pendingGroupId = groupId;
   }, []);
 
-  // Timer tick effect
+  // Timer tick effect - recalculates from actual timestamp each tick
   useEffect(() => {
     if (config.state === 'running') {
-      intervalRef.current = setInterval(() => {
-        setConfig(prev => {
-          const newElapsed = prev.elapsed + 1;
+      const updateElapsed = () => {
+        if (startTimeRef.current) {
+          const startMs = new Date(startTimeRef.current).getTime();
+          const now = Date.now();
+          const newElapsed = pausedElapsedRef.current + Math.floor((now - startMs) / 1000);
 
-          // Check if countdown just hit zero (for notification purposes)
-          if (prev.mode === 'countdown' && newElapsed === prev.duration) {
-            setCountdownComplete(true);
-            // Don't stop - just mark as complete and keep counting
-          }
+          setConfig(prev => {
+            // Check if countdown just hit zero (for notification purposes)
+            if (prev.mode === 'countdown' && prev.elapsed < prev.duration && newElapsed >= prev.duration) {
+              setCountdownComplete(true);
+            }
 
-          return { ...prev, elapsed: newElapsed };
-        });
-      }, 1000);
+            return { ...prev, elapsed: newElapsed };
+          });
+        }
+      };
+
+      // Update immediately when starting
+      updateElapsed();
+
+      // Then update every second
+      intervalRef.current = setInterval(updateElapsed, 1000);
+
+      // Also update when tab becomes visible again
+      const handleVisibilityChange = () => {
+        if (!document.hidden) {
+          updateElapsed();
+        }
+      };
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+
+      return () => {
+        clearTimerInterval();
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
     } else {
       clearTimerInterval();
     }

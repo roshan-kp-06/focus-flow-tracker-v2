@@ -1,5 +1,5 @@
-import { Clock, Play, MoreHorizontal, Trash2, ListFilter } from 'lucide-react';
-import { format, parseISO, startOfWeek, endOfWeek, isToday, isYesterday } from 'date-fns';
+import { Clock, Play, MoreHorizontal, Trash2, ListFilter, Check } from 'lucide-react';
+import { format, parseISO, startOfWeek, isToday, isYesterday } from 'date-fns';
 import { WorkSession, Project } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -10,6 +10,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 
 interface SessionListProps {
   sessions: WorkSession[];
@@ -17,6 +22,7 @@ interface SessionListProps {
   weekTotal: number;
   onDeleteSession: (sessionId: string) => void;
   onContinueSession: (session: WorkSession) => void;
+  onUpdateSession?: (sessionId: string, updates: Partial<WorkSession>) => void;
 }
 
 export function SessionList({
@@ -25,6 +31,7 @@ export function SessionList({
   weekTotal,
   onDeleteSession,
   onContinueSession,
+  onUpdateSession,
 }: SessionListProps) {
   const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set());
 
@@ -49,6 +56,12 @@ export function SessionList({
       newSelected.add(sessionId);
     }
     setSelectedSessions(newSelected);
+  };
+
+  const handleProjectChange = (sessionId: string, projectId: string) => {
+    if (onUpdateSession) {
+      onUpdateSession(sessionId, { projectIds: [projectId] });
+    }
   };
 
   // Group sessions by date
@@ -87,24 +100,6 @@ export function SessionList({
     });
 
     return weeks.sort((a, b) => b.weekStart.getTime() - a.weekStart.getTime());
-  };
-
-  const getWeekTotal = (weekDates: string[]) => {
-    return weekDates.reduce((acc, date) => {
-      return acc + getDateTotal(groupedSessions[date]);
-    }, 0);
-  };
-
-  const formatWeekLabel = (weekStart: Date) => {
-    const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
-    const now = new Date();
-    const currentWeekStart = startOfWeek(now, { weekStartsOn: 1 });
-
-    if (format(weekStart, 'yyyy-MM-dd') === format(currentWeekStart, 'yyyy-MM-dd')) {
-      return 'This Week';
-    }
-
-    return `${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d')}`;
   };
 
   const formatDayLabel = (dateStr: string) => {
@@ -199,7 +194,7 @@ export function SessionList({
                   {daySessions.map((session) => (
                     <div
                       key={session.id}
-                      className="flex items-center gap-4 px-5 py-3 hover:bg-muted/30 transition-colors"
+                      className="grid grid-cols-[auto_1fr_140px_140px_100px_auto_auto] items-center gap-4 px-5 py-3 hover:bg-muted/30 transition-colors"
                     >
                       {/* Checkbox */}
                       <Checkbox
@@ -208,8 +203,8 @@ export function SessionList({
                         className="border-muted-foreground/40"
                       />
 
-                      {/* Task Name & Projects */}
-                      <div className="flex-1 min-w-0">
+                      {/* Task Name */}
+                      <div className="min-w-0">
                         <p className="text-sm font-medium text-foreground truncate">
                           {session.taskName || 'Untitled session'}
                         </p>
@@ -220,32 +215,64 @@ export function SessionList({
                         )}
                       </div>
 
-                      {/* Project Badges */}
-                      <div className="flex items-center gap-1.5">
-                        {session.projectIds.slice(0, 1).map((projectId) => {
-                          const project = getProjectById(projectId);
-                          if (!project) return null;
-                          return (
-                            <span
-                              key={projectId}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
-                              style={{
-                                backgroundColor: `${project.color}18`,
-                                color: project.color,
-                              }}
-                            >
-                              <span
-                                className="w-1.5 h-1.5 rounded-full"
-                                style={{ backgroundColor: project.color }}
-                              />
-                              {project.name}
-                            </span>
-                          );
-                        })}
+                      {/* Project Badge - Clickable to change */}
+                      <div className="flex items-center justify-start">
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity">
+                              {session.projectIds.length > 0 ? (
+                                (() => {
+                                  const project = getProjectById(session.projectIds[0]);
+                                  if (!project) return <span className="text-muted-foreground">No project</span>;
+                                  return (
+                                    <span
+                                      className="inline-flex items-center gap-1.5"
+                                      style={{
+                                        backgroundColor: `${project.color}18`,
+                                        color: project.color,
+                                        padding: '4px 10px',
+                                        borderRadius: '9999px',
+                                      }}
+                                    >
+                                      <span
+                                        className="w-1.5 h-1.5 rounded-full"
+                                        style={{ backgroundColor: project.color }}
+                                      />
+                                      {project.name}
+                                    </span>
+                                  );
+                                })()
+                              ) : (
+                                <span className="text-muted-foreground text-xs">+ Add project</span>
+                              )}
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-48 p-1" align="start">
+                            <div className="text-xs font-medium text-muted-foreground px-2 py-1.5">
+                              Select Project
+                            </div>
+                            {projects.map((project) => (
+                              <button
+                                key={project.id}
+                                onClick={() => handleProjectChange(session.id, project.id)}
+                                className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted transition-colors"
+                              >
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full"
+                                  style={{ backgroundColor: project.color }}
+                                />
+                                <span className="flex-1 text-left">{project.name}</span>
+                                {session.projectIds.includes(project.id) && (
+                                  <Check className="h-3.5 w-3.5 text-primary" />
+                                )}
+                              </button>
+                            ))}
+                          </PopoverContent>
+                        </Popover>
                       </div>
 
                       {/* Time Range */}
-                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground min-w-[120px]">
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                         <Clock className="h-3.5 w-3.5" />
                         <span>{formatTimeOnly(session.startTime)}</span>
                         <span>-</span>
@@ -254,7 +281,7 @@ export function SessionList({
                       </div>
 
                       {/* Duration */}
-                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground min-w-[90px]">
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                         <Clock className="h-3.5 w-3.5" />
                         <span className="font-medium text-foreground">{formatDuration(session.duration)}</span>
                       </div>

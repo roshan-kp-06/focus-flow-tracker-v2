@@ -81,6 +81,16 @@ export function deleteSession(sessionId: string): WorkSession[] {
   return sessions;
 }
 
+export function updateSession(sessionId: string, updates: Partial<WorkSession>): WorkSession[] {
+  const sessions = getSessions();
+  const index = sessions.findIndex(s => s.id === sessionId);
+  if (index !== -1) {
+    sessions[index] = { ...sessions[index], ...updates };
+    saveSessions(sessions);
+  }
+  return sessions;
+}
+
 export function getSessionsByDate(date: string): WorkSession[] {
   return getSessions().filter(s => s.date === date);
 }

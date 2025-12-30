@@ -116,6 +116,7 @@ const Index = () => {
                 weekTotal={sessions.getWeekTotal()}
                 onDeleteSession={sessions.removeSession}
                 onContinueSession={handleContinueSession}
+                onUpdateSession={sessions.editSession}
               />
             </div>
           )}

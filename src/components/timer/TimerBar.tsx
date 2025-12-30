@@ -119,10 +119,9 @@ export function TimerBar({
               <Button
                 onClick={onStop}
                 variant="destructive"
-                className="h-10 gap-2 px-5 rounded-full"
+                className="h-10 w-10 p-0 rounded-full"
               >
                 <Square className="h-4 w-4 fill-current" />
-                Stop
               </Button>
             </>
           )}
@@ -131,18 +130,17 @@ export function TimerBar({
             <>
               <Button
                 onClick={onResume}
-                className="h-10 gap-2 px-5 bg-primary hover:bg-primary/90 rounded-full"
+                variant="outline"
+                className="h-10 w-10 p-0 rounded-full"
               >
-                <Play className="h-4 w-4 fill-current" />
-                Resume
+                <Play className="h-4 w-4" />
               </Button>
               <Button
                 onClick={onStop}
                 variant="destructive"
-                className="h-10 gap-2 px-5 rounded-full"
+                className="h-10 w-10 p-0 rounded-full"
               >
                 <Square className="h-4 w-4 fill-current" />
-                Stop
               </Button>
             </>
           )}

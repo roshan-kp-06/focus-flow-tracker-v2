@@ -10,9 +10,14 @@ import { DailyChart } from '@/components/DailyChart';
 import { ProjectBreakdown } from '@/components/ProjectBreakdown';
 import { MonthSummary } from '@/components/MonthSummary';
 import { WorkSession } from '@/types';
+import { List, Calendar, CalendarDays } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+type ViewMode = 'list' | 'week' | 'day';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState<'timer' | 'reports' | 'settings'>('timer');
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
   const timer = useTimer();
   const sessions = useWorkSessions();
 
@@ -36,14 +41,9 @@ const Index = () => {
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
-        <div className="p-6">
+        <div className="p-6 max-w-6xl">
           {activeTab === 'timer' && (
             <div className="space-y-6">
-              {/* Header with Week Stats */}
-              <div className="flex items-center justify-end">
-                <WeekStats weekTotal={sessions.getWeekTotal()} />
-              </div>
-
               {/* Timer Bar */}
               <TimerBar
                 taskName={timer.config.taskName}
@@ -63,6 +63,52 @@ const Index = () => {
                 onStop={timer.stop}
               />
 
+              {/* View Toggle & Week Stats */}
+              <div className="flex items-center justify-between">
+                {/* View Mode Toggle */}
+                <div className="flex items-center bg-card border border-border rounded-lg p-1">
+                  <button
+                    onClick={() => setViewMode('list')}
+                    className={cn(
+                      'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+                      viewMode === 'list'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    <List className="h-4 w-4" />
+                    List
+                  </button>
+                  <button
+                    onClick={() => setViewMode('week')}
+                    className={cn(
+                      'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+                      viewMode === 'week'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    <Calendar className="h-4 w-4" />
+                    Week
+                  </button>
+                  <button
+                    onClick={() => setViewMode('day')}
+                    className={cn(
+                      'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+                      viewMode === 'day'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    <CalendarDays className="h-4 w-4" />
+                    Day
+                  </button>
+                </div>
+
+                {/* Week Stats */}
+                <WeekStats weekTotal={sessions.getWeekTotal()} />
+              </div>
+
               {/* Session List */}
               <SessionList
                 sessions={sessions.sessions}
@@ -77,7 +123,7 @@ const Index = () => {
           {activeTab === 'reports' && (
             <div className="space-y-6">
               <h1 className="text-xl font-semibold">Reports</h1>
-              
+
               {/* Month Summary */}
               <MonthSummary
                 monthTotal={sessions.getMonthTotal()}

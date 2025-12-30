@@ -1,7 +1,9 @@
-import { Clock, Play, MoreHorizontal, Trash2 } from 'lucide-react';
-import { format, parseISO, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
+import { Clock, Play, MoreHorizontal, Trash2, ListFilter } from 'lucide-react';
+import { format, parseISO, startOfWeek, endOfWeek, isToday, isYesterday } from 'date-fns';
 import { WorkSession, Project } from '@/types';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useState } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +26,8 @@ export function SessionList({
   onDeleteSession,
   onContinueSession,
 }: SessionListProps) {
+  const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set());
+
   const formatDuration = (seconds: number) => {
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
@@ -31,13 +35,21 @@ export function SessionList({
     return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const formatTimeRange = (startTime: string, endTime: string) => {
-    const start = format(parseISO(startTime), 'HH:mm');
-    const end = format(parseISO(endTime), 'HH:mm');
-    return `${start} - ${end}`;
+  const formatTimeOnly = (timeString: string) => {
+    return format(parseISO(timeString), 'HH:mm');
   };
 
   const getProjectById = (id: string) => projects.find(p => p.id === id);
+
+  const toggleSession = (sessionId: string) => {
+    const newSelected = new Set(selectedSessions);
+    if (newSelected.has(sessionId)) {
+      newSelected.delete(sessionId);
+    } else {
+      newSelected.add(sessionId);
+    }
+    setSelectedSessions(newSelected);
+  };
 
   // Group sessions by date
   const groupedSessions = sessions.reduce((acc, session) => {
@@ -58,22 +70,22 @@ export function SessionList({
   // Group dates by week
   const groupByWeek = (dates: string[]) => {
     const weeks: { weekStart: Date; dates: string[] }[] = [];
-    
+
     dates.forEach(dateStr => {
       const date = parseISO(dateStr);
       const weekStart = startOfWeek(date, { weekStartsOn: 1 });
-      
-      const existingWeek = weeks.find(w => 
+
+      const existingWeek = weeks.find(w =>
         format(w.weekStart, 'yyyy-MM-dd') === format(weekStart, 'yyyy-MM-dd')
       );
-      
+
       if (existingWeek) {
         existingWeek.dates.push(dateStr);
       } else {
         weeks.push({ weekStart, dates: [dateStr] });
       }
     });
-    
+
     return weeks.sort((a, b) => b.weekStart.getTime() - a.weekStart.getTime());
   };
 
@@ -87,12 +99,23 @@ export function SessionList({
     const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
     const now = new Date();
     const currentWeekStart = startOfWeek(now, { weekStartsOn: 1 });
-    
+
     if (format(weekStart, 'yyyy-MM-dd') === format(currentWeekStart, 'yyyy-MM-dd')) {
       return 'This Week';
     }
-    
+
     return `${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d')}`;
+  };
+
+  const formatDayLabel = (dateStr: string) => {
+    const date = parseISO(dateStr);
+    if (isToday(date)) {
+      return `Today, ${format(date, 'd MMM yyyy')}`;
+    }
+    if (isYesterday(date)) {
+      return `Yesterday, ${format(date, 'd MMM yyyy')}`;
+    }
+    return `${format(date, 'EEEE')}, ${format(date, 'd MMM yyyy')}`;
   };
 
   const weeks = groupByWeek(sortedDates);
@@ -108,91 +131,137 @@ export function SessionList({
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {weeks.map((week) => (
-        <div key={format(week.weekStart, 'yyyy-MM-dd')}>
-          {/* Week Header */}
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium text-muted-foreground">
-              {formatWeekLabel(week.weekStart)}
-            </h3>
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground">Week total:</span>
-              <span className="font-semibold text-foreground">{formatDuration(getWeekTotal(week.dates))}</span>
-            </div>
-          </div>
-
+        <div key={format(week.weekStart, 'yyyy-MM-dd')} className="space-y-4">
           {/* Days in Week */}
-          {week.dates.map((date) => (
-            <div key={date} className="mb-6">
-              {/* Day Header */}
-              <div className="flex items-center justify-between py-2 border-b border-border mb-2">
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-foreground">
-                    {format(parseISO(date), 'EEE, d MMM')}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-muted-foreground">Total:</span>
-                  <span className="font-medium">{formatDuration(getDateTotal(groupedSessions[date]))}</span>
-                </div>
-              </div>
+          {week.dates.map((date) => {
+            const daySessions = groupedSessions[date];
+            const daySelectedCount = daySessions.filter(s => selectedSessions.has(s.id)).length;
 
-              {/* Sessions */}
-              <div className="space-y-1">
-                {groupedSessions[date].map((session) => (
-                  <div
-                    key={session.id}
-                    className="session-row group"
-                  >
-                    {/* Task Name & Projects */}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {session.taskName || 'Untitled session'}
-                      </p>
-                      {session.projectIds.length > 0 && (
-                        <div className="flex items-center gap-1.5 mt-1">
-                          {session.projectIds.map((projectId) => {
-                            const project = getProjectById(projectId);
-                            if (!project) return null;
-                            return (
+            return (
+              <div key={date} className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
+                {/* Day Header */}
+                <div className="flex items-center justify-between px-5 py-3 bg-muted/30 border-b border-border">
+                  <div className="flex items-center gap-3">
+                    <Checkbox
+                      checked={daySelectedCount === daySessions.length && daySessions.length > 0}
+                      onCheckedChange={(checked) => {
+                        const newSelected = new Set(selectedSessions);
+                        daySessions.forEach(s => {
+                          if (checked) {
+                            newSelected.add(s.id);
+                          } else {
+                            newSelected.delete(s.id);
+                          }
+                        });
+                        setSelectedSessions(newSelected);
+                      }}
+                      className="border-muted-foreground/40"
+                    />
+                    <span className="text-sm font-semibold text-foreground">
+                      {formatDayLabel(date)}
+                    </span>
+                    {daySelectedCount > 0 && (
+                      <span className="text-sm text-muted-foreground">
+                        | {daySelectedCount} Item{daySelectedCount > 1 ? 's' : ''} Selected
+                      </span>
+                    )}
+                    {daySelectedCount > 0 && (
+                      <div className="flex items-center gap-2 ml-2">
+                        <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5">
+                          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                          Bulk Edit
+                        </Button>
+                        <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5 text-destructive hover:text-destructive">
+                          <Trash2 className="h-3 w-3" />
+                          Delete
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-muted-foreground">Total :</span>
+                    <div className="flex items-center gap-2 bg-background border border-border rounded-full px-3 py-1">
+                      <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-sm font-semibold">{formatDuration(getDateTotal(daySessions))}</span>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <ListFilter className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Sessions */}
+                <div className="divide-y divide-border">
+                  {daySessions.map((session) => (
+                    <div
+                      key={session.id}
+                      className="flex items-center gap-4 px-5 py-3 hover:bg-muted/30 transition-colors"
+                    >
+                      {/* Checkbox */}
+                      <Checkbox
+                        checked={selectedSessions.has(session.id)}
+                        onCheckedChange={() => toggleSession(session.id)}
+                        className="border-muted-foreground/40"
+                      />
+
+                      {/* Task Name & Projects */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {session.taskName || 'Untitled session'}
+                        </p>
+                        {session.projectIds.length > 0 && (
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {session.projectIds.map(id => getProjectById(id)?.name).filter(Boolean).join(', ')}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Project Badges */}
+                      <div className="flex items-center gap-1.5">
+                        {session.projectIds.slice(0, 1).map((projectId) => {
+                          const project = getProjectById(projectId);
+                          if (!project) return null;
+                          return (
+                            <span
+                              key={projectId}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+                              style={{
+                                backgroundColor: `${project.color}18`,
+                                color: project.color,
+                              }}
+                            >
                               <span
-                                key={projectId}
-                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium"
-                                style={{
-                                  backgroundColor: `${project.color}15`,
-                                  color: project.color,
-                                }}
-                              >
-                                <span
-                                  className="w-1.5 h-1.5 rounded-full"
-                                  style={{ backgroundColor: project.color }}
-                                />
-                                {project.name}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
+                                className="w-1.5 h-1.5 rounded-full"
+                                style={{ backgroundColor: project.color }}
+                              />
+                              {project.name}
+                            </span>
+                          );
+                        })}
+                      </div>
 
-                    {/* Time Range */}
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <Clock className="h-3.5 w-3.5" />
-                      {session.startTime && session.endTime && (
-                        <span>{formatTimeRange(session.startTime, session.endTime)}</span>
-                      )}
-                    </div>
+                      {/* Time Range */}
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground min-w-[120px]">
+                        <Clock className="h-3.5 w-3.5" />
+                        <span>{formatTimeOnly(session.startTime)}</span>
+                        <span>-</span>
+                        <Clock className="h-3.5 w-3.5" />
+                        <span>{formatTimeOnly(session.endTime)}</span>
+                      </div>
 
-                    {/* Duration */}
-                    <div className="w-20 text-right">
-                      <span className="text-sm font-medium">{formatDuration(session.duration)}</span>
-                    </div>
+                      {/* Duration */}
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground min-w-[90px]">
+                        <Clock className="h-3.5 w-3.5" />
+                        <span className="font-medium text-foreground">{formatDuration(session.duration)}</span>
+                      </div>
 
-                    {/* Actions */}
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {/* Continue Button */}
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
                         onClick={() => onContinueSession(session)}
                         className="h-8 gap-1.5 text-muted-foreground hover:text-foreground"
@@ -200,6 +269,8 @@ export function SessionList({
                         <Play className="h-3.5 w-3.5" />
                         Continue
                       </Button>
+
+                      {/* More Actions */}
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -217,11 +288,11 @@ export function SessionList({
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ))}
     </div>

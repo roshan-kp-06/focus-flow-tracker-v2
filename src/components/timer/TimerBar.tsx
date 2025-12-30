@@ -1,4 +1,4 @@
-import { Play, Square, Pause } from 'lucide-react';
+import { Play, Square, Pause, Plus, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { TimerState, Project, TimerMode } from '@/types';
@@ -64,15 +64,27 @@ export function TimerBar({
   };
 
   return (
-    <div className="bg-card border border-border rounded-lg p-3 shadow-sm">
-      <div className="flex items-center gap-3">
-        {/* Task Name */}
-        <Input
-          placeholder="What are you working on?"
-          value={taskName}
-          onChange={(e) => onTaskNameChange(e.target.value)}
-          className="flex-1 border-0 shadow-none bg-transparent text-sm focus-visible:ring-0 placeholder:text-muted-foreground"
-        />
+    <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
+      <div className="flex items-center gap-4">
+        {/* Task Name Input */}
+        <div className="flex-1 flex items-center gap-3">
+          <Input
+            placeholder="What are you working on?"
+            value={taskName}
+            onChange={(e) => onTaskNameChange(e.target.value)}
+            className="flex-1 border border-border rounded-lg bg-background text-sm h-10 px-4 focus-visible:ring-1 focus-visible:ring-primary placeholder:text-muted-foreground"
+          />
+        </div>
+
+        {/* + Task Button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-10 gap-2 px-4 border-primary text-primary hover:bg-primary/5"
+        >
+          <Plus className="h-4 w-4" />
+          Task
+        </Button>
 
         {/* Project Selector */}
         <ProjectDropdown
@@ -81,48 +93,19 @@ export function TimerBar({
           onSelectionChange={onProjectChange}
         />
 
-        {/* Mode Toggle */}
-        <div className="flex items-center border border-border rounded-md overflow-hidden">
-          <button
-            onClick={() => onModeChange('stopwatch')}
-            disabled={state !== 'idle'}
-            className={cn(
-              'px-2.5 py-1.5 text-xs font-medium transition-colors',
-              mode === 'stopwatch' 
-                ? 'bg-muted text-foreground' 
-                : 'text-muted-foreground hover:text-foreground',
-              state !== 'idle' && 'opacity-50 cursor-not-allowed'
-            )}
-          >
-            Stopwatch
-          </button>
-          <button
-            onClick={() => onModeChange('countdown')}
-            disabled={state !== 'idle'}
-            className={cn(
-              'px-2.5 py-1.5 text-xs font-medium transition-colors',
-              mode === 'countdown' 
-                ? 'bg-muted text-foreground' 
-                : 'text-muted-foreground hover:text-foreground',
-              state !== 'idle' && 'opacity-50 cursor-not-allowed'
-            )}
-          >
-            Timer
-          </button>
-        </div>
-
-        {/* Duration Input (countdown mode) or Timer Display */}
-        <div className="w-28 text-center">
+        {/* Timer Display */}
+        <div className="flex items-center gap-2 bg-muted/50 rounded-full px-4 py-2">
+          <Clock className="h-4 w-4 text-muted-foreground" />
           {state === 'idle' && mode === 'countdown' ? (
             <Input
               defaultValue={formatDurationInput(duration)}
               onBlur={(e) => handleDurationInput(e.target.value)}
-              className="text-center font-medium text-sm border-0 shadow-none bg-transparent focus-visible:ring-0"
+              className="w-24 text-center font-semibold text-sm border-0 shadow-none bg-transparent focus-visible:ring-0 p-0"
               placeholder="00:25:00"
             />
           ) : (
             <span className={cn(
-              'timer-display',
+              'font-semibold text-base tabular-nums min-w-[80px] text-center',
               state === 'running' && 'text-primary',
               state === 'paused' && 'text-muted-foreground'
             )}>
@@ -132,35 +115,35 @@ export function TimerBar({
         </div>
 
         {/* Control Buttons */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           {state === 'idle' && (
             <Button
               onClick={onStart}
               size="sm"
-              className="gap-1.5 bg-primary hover:bg-primary/90"
+              className="h-10 gap-2 px-5 bg-primary hover:bg-primary/90 rounded-full"
             >
-              <Play className="h-3.5 w-3.5 fill-current" />
+              <Play className="h-4 w-4 fill-current" />
               Start
             </Button>
           )}
-          
+
           {state === 'running' && (
             <>
               <Button
                 onClick={onPause}
                 size="sm"
                 variant="outline"
-                className="gap-1.5"
+                className="h-10 w-10 p-0 rounded-full"
               >
-                <Pause className="h-3.5 w-3.5" />
+                <Pause className="h-4 w-4" />
               </Button>
               <Button
                 onClick={onStop}
                 size="sm"
                 variant="destructive"
-                className="gap-1.5"
+                className="h-10 gap-2 px-5 rounded-full"
               >
-                <Square className="h-3.5 w-3.5 fill-current" />
+                <Square className="h-4 w-4 fill-current" />
                 Stop
               </Button>
             </>
@@ -171,17 +154,18 @@ export function TimerBar({
               <Button
                 onClick={onResume}
                 size="sm"
-                className="gap-1.5 bg-primary hover:bg-primary/90"
+                className="h-10 gap-2 px-5 bg-primary hover:bg-primary/90 rounded-full"
               >
-                <Play className="h-3.5 w-3.5 fill-current" />
+                <Play className="h-4 w-4 fill-current" />
+                Resume
               </Button>
               <Button
                 onClick={onStop}
                 size="sm"
                 variant="destructive"
-                className="gap-1.5"
+                className="h-10 gap-2 px-5 rounded-full"
               >
-                <Square className="h-3.5 w-3.5 fill-current" />
+                <Square className="h-4 w-4 fill-current" />
                 Stop
               </Button>
             </>

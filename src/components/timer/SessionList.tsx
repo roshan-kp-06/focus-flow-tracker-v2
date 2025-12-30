@@ -315,7 +315,7 @@ export function SessionList({
                   {daySessions.map((session) => (
                     <div
                       key={session.id}
-                      className="grid grid-cols-[auto_1fr_140px_140px_100px_auto_auto] items-center gap-4 px-5 py-3 hover:bg-muted/30 transition-colors"
+                      className="grid grid-cols-[auto_1fr_140px_180px_100px_auto_auto] items-center gap-4 px-5 py-3 hover:bg-muted/30 transition-colors"
                     >
                       {/* Checkbox */}
                       <Checkbox
@@ -397,18 +397,19 @@ export function SessionList({
 
                       {/* Time Range - Editable */}
                       <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <Clock className="h-3.5 w-3.5 flex-shrink-0" />
                         <input
                           type="time"
                           defaultValue={formatTimeOnly(session.startTime)}
                           onBlur={(e) => handleTimeEdit(session, 'startTime', e.target.value)}
-                          className="bg-transparent border-none outline-none w-14 text-center hover:bg-muted/50 focus:bg-muted/50 rounded px-1 py-0.5"
+                          className="bg-transparent border-none outline-none w-[70px] hover:bg-muted/50 focus:bg-muted/50 rounded px-1 py-0.5 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute"
                         />
                         <span>-</span>
                         <input
                           type="time"
                           defaultValue={formatTimeOnly(session.endTime)}
                           onBlur={(e) => handleTimeEdit(session, 'endTime', e.target.value)}
-                          className="bg-transparent border-none outline-none w-14 text-center hover:bg-muted/50 focus:bg-muted/50 rounded px-1 py-0.5"
+                          className="bg-transparent border-none outline-none w-[70px] hover:bg-muted/50 focus:bg-muted/50 rounded px-1 py-0.5 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute"
                         />
                       </div>
 

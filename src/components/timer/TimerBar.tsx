@@ -202,19 +202,19 @@ export function TimerBar({
         {/* Divider */}
         <div className="h-8 w-px bg-border" />
 
-        {/* Timer Display */}
-        <div className="flex items-center gap-2">
-          <Clock className={cn("h-4 w-4", isOvertime ? "text-orange-500" : "text-muted-foreground")} />
+        {/* Timer Display - Fixed width to prevent layout shift */}
+        <div className="flex items-center gap-2 w-[120px]">
+          <Clock className={cn("h-4 w-4 flex-shrink-0", isOvertime ? "text-orange-500" : "text-muted-foreground")} />
           {state === 'idle' && mode === 'countdown' ? (
             <input
               type="text"
               onBlur={(e) => handleDurationInput(e.target.value)}
-              className="w-24 text-center font-semibold text-base border border-transparent rounded-lg bg-transparent hover:bg-muted/50 focus:bg-background focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary tabular-nums px-2 py-1 transition-all cursor-pointer"
+              className="w-full text-center font-semibold text-base border border-transparent rounded-lg bg-transparent hover:bg-muted/50 focus:bg-background focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary tabular-nums px-2 py-1 transition-all cursor-pointer"
               placeholder="1h 30m"
             />
           ) : (
             <span className={cn(
-              'font-semibold text-base tabular-nums',
+              'font-semibold text-base tabular-nums w-full text-center',
               isOvertime && 'text-orange-500',
               !isOvertime && state === 'running' && 'text-primary',
               !isOvertime && state === 'paused' && 'text-muted-foreground'

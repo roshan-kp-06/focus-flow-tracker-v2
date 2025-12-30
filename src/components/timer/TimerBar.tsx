@@ -1,4 +1,4 @@
-import { Play, Square, Pause, Clock, Timer, Hourglass, Check, FolderOpen } from 'lucide-react';
+import { Play, Square, Pause, Clock, Timer, Hourglass, Check, FolderOpen, Maximize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { TimerState, Project, TimerMode } from '@/types';
@@ -26,6 +26,7 @@ interface TimerBarProps {
   onPause: () => void;
   onResume: () => void;
   onStop: () => void;
+  onEnterFocus?: () => void;
 }
 
 export function TimerBar({
@@ -45,6 +46,7 @@ export function TimerBar({
   onPause,
   onResume,
   onStop,
+  onEnterFocus,
 }: TimerBarProps) {
   const getProjectById = (id: string) => projects.find(p => p.id === id);
   const selectedProject = selectedProjectIds.length > 0 ? getProjectById(selectedProjectIds[0]) : null;
@@ -163,6 +165,17 @@ export function TimerBar({
             ))}
           </PopoverContent>
         </Popover>
+
+        {/* Focus View Button - only show when timer is running or paused */}
+        {state !== 'idle' && onEnterFocus && (
+          <button
+            onClick={onEnterFocus}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border hover:bg-muted/50 transition-colors text-sm text-muted-foreground hover:text-foreground"
+          >
+            <Maximize2 className="h-4 w-4" />
+            <span>Focus</span>
+          </button>
+        )}
 
         {/* Divider */}
         <div className="h-8 w-px bg-border" />

@@ -5,6 +5,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { TimerBar } from '@/components/timer/TimerBar';
 import { SessionList } from '@/components/timer/SessionList';
 import { WeekStats } from '@/components/timer/WeekStats';
+import { FocusView } from '@/components/timer/FocusView';
 import { Settings } from '@/pages/Settings';
 import { DailyChart } from '@/components/DailyChart';
 import { ProjectBreakdown } from '@/components/ProjectBreakdown';
@@ -18,15 +19,22 @@ type ViewMode = 'list' | 'week' | 'day';
 const Index = () => {
   const [activeTab, setActiveTab] = useState<'timer' | 'reports' | 'settings'>('timer');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [isFocusMode, setIsFocusMode] = useState(false);
   const timer = useTimer();
   const sessions = useWorkSessions();
 
-  // Refresh sessions when timer stops
+  // Refresh sessions when timer stops and exit focus mode
   useEffect(() => {
     if (timer.config.state === 'idle') {
       sessions.refresh();
+      setIsFocusMode(false);
     }
   }, [timer.config.state]);
+
+  const handleStopAndExitFocus = () => {
+    timer.stop();
+    setIsFocusMode(false);
+  };
 
   const handleContinueSession = (session: WorkSession) => {
     timer.setTaskName(session.taskName);
@@ -62,6 +70,7 @@ const Index = () => {
                 onPause={timer.pause}
                 onResume={timer.resume}
                 onStop={timer.stop}
+                onEnterFocus={() => setIsFocusMode(true)}
               />
 
               {/* View Toggle & Week Stats */}
@@ -154,6 +163,25 @@ const Index = () => {
           )}
         </div>
       </main>
+
+      {/* Focus View Overlay */}
+      {isFocusMode && timer.config.state !== 'idle' && (
+        <FocusView
+          taskName={timer.config.taskName}
+          projectIds={timer.config.projectIds}
+          projects={sessions.projects}
+          mode={timer.config.mode}
+          formattedTime={timer.formattedTime}
+          state={timer.config.state}
+          isOvertime={timer.isOvertime}
+          duration={timer.config.duration}
+          elapsed={timer.config.elapsed}
+          onPause={timer.pause}
+          onResume={timer.resume}
+          onStop={handleStopAndExitFocus}
+          onExit={() => setIsFocusMode(false)}
+        />
+      )}
     </div>
   );
 };

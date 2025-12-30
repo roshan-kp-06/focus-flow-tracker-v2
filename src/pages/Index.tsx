@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useTimer } from '@/hooks/useTimer';
 import { useWorkSessions } from '@/hooks/useWorkSessions';
-import { useTaskPlanner } from '@/hooks/useTaskPlanner';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { TimerBar } from '@/components/timer/TimerBar';
 import { SessionList } from '@/components/timer/SessionList';
 import { WeekStats } from '@/components/timer/WeekStats';
 import { FocusView } from '@/components/timer/FocusView';
-import { Tasks } from '@/pages/Tasks';
 import { Settings } from '@/pages/Settings';
 import { Reports } from '@/pages/Reports';
 import { WorkSession } from '@/types';
@@ -17,12 +15,11 @@ import { cn } from '@/lib/utils';
 type ViewMode = 'list' | 'week' | 'day';
 
 const Index = () => {
-  const [activeTab, setActiveTab] = useState<'timer' | 'tasks' | 'reports' | 'settings'>('timer');
+  const [activeTab, setActiveTab] = useState<'timer' | 'reports' | 'settings'>('timer');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [isFocusMode, setIsFocusMode] = useState(false);
   const timer = useTimer();
   const sessions = useWorkSessions();
-  const taskPlanner = useTaskPlanner();
 
   // Refresh sessions when timer stops
   useEffect(() => {
@@ -143,21 +140,6 @@ const Index = () => {
                 onUpdateSession={sessions.editSession}
               />
             </div>
-          )}
-
-          {activeTab === 'tasks' && (
-            <Tasks
-              taskPlanner={taskPlanner}
-              projects={sessions.projects}
-              onStartTimer={(task) => {
-                timer.setTaskName(task.title);
-                timer.setProjectIds(task.projectIds);
-                timer.setPlannerTaskId(task.id);
-                timer.start();
-                setActiveTab('timer');
-              }}
-              timerState={timer.config.state}
-            />
           )}
 
           {activeTab === 'reports' && (

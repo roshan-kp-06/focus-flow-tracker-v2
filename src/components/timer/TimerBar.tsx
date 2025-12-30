@@ -1,4 +1,4 @@
-import { Play, Square, Pause, Clock, Timer, Hourglass, Check, X, FolderOpen } from 'lucide-react';
+import { Play, Square, Pause, Clock, Timer, Hourglass, Check, FolderOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { TimerState, Project, TimerMode } from '@/types';
@@ -138,19 +138,17 @@ export function TimerBar({
             <div className="text-xs font-medium text-muted-foreground px-2 py-1.5">
               Select Project
             </div>
-            {selectedProjectIds.length > 0 && (
-              <button
-                onClick={() => onProjectChange([])}
-                className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted transition-colors text-muted-foreground"
-              >
-                <X className="h-3.5 w-3.5" />
-                <span className="flex-1 text-left">No project</span>
-              </button>
-            )}
             {projects.map((project) => (
               <button
                 key={project.id}
-                onClick={() => onProjectChange([project.id])}
+                onClick={() => {
+                  // Toggle: if already selected, deselect; otherwise select
+                  if (selectedProjectIds.includes(project.id)) {
+                    onProjectChange([]);
+                  } else {
+                    onProjectChange([project.id]);
+                  }
+                }}
                 className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted transition-colors"
               >
                 <span

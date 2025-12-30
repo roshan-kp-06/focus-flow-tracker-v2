@@ -1,4 +1,4 @@
-import { Play, Square, Pause, Clock } from 'lucide-react';
+import { Play, Square, Pause, Clock, Timer, Hourglass } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { TimerState, Project, TimerMode } from '@/types';
@@ -16,6 +16,7 @@ interface TimerBarProps {
   onDurationChange: (duration: number) => void;
   formattedTime: string;
   state: TimerState;
+  isOvertime?: boolean;
   onStart: () => void;
   onPause: () => void;
   onResume: () => void;
@@ -26,10 +27,12 @@ export function TimerBar({
   taskName,
   onTaskNameChange,
   mode,
+  onModeChange,
   duration,
   onDurationChange,
   formattedTime,
   state,
+  isOvertime = false,
   onStart,
   onPause,
   onResume,
@@ -71,9 +74,44 @@ export function TimerBar({
         {/* Divider */}
         <div className="h-8 w-px bg-border" />
 
+        {/* Mode Toggle */}
+        <div className="flex items-center border border-border rounded-lg overflow-hidden">
+          <button
+            onClick={() => onModeChange('stopwatch')}
+            disabled={state !== 'idle'}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors',
+              mode === 'stopwatch'
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+              state !== 'idle' && 'opacity-50 cursor-not-allowed'
+            )}
+          >
+            <Timer className="h-3.5 w-3.5" />
+            Stopwatch
+          </button>
+          <button
+            onClick={() => onModeChange('countdown')}
+            disabled={state !== 'idle'}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors',
+              mode === 'countdown'
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+              state !== 'idle' && 'opacity-50 cursor-not-allowed'
+            )}
+          >
+            <Hourglass className="h-3.5 w-3.5" />
+            Timer
+          </button>
+        </div>
+
+        {/* Divider */}
+        <div className="h-8 w-px bg-border" />
+
         {/* Timer Display */}
         <div className="flex items-center gap-2">
-          <Clock className="h-4 w-4 text-muted-foreground" />
+          <Clock className={cn("h-4 w-4", isOvertime ? "text-orange-500" : "text-muted-foreground")} />
           {state === 'idle' && mode === 'countdown' ? (
             <Input
               defaultValue={formatDurationInput(duration)}
@@ -84,9 +122,11 @@ export function TimerBar({
           ) : (
             <span className={cn(
               'font-semibold text-base tabular-nums',
-              state === 'running' && 'text-primary',
-              state === 'paused' && 'text-muted-foreground'
+              isOvertime && 'text-orange-500',
+              !isOvertime && state === 'running' && 'text-primary',
+              !isOvertime && state === 'paused' && 'text-muted-foreground'
             )}>
+              {isOvertime && '+'}
               {formattedTime}
             </span>
           )}

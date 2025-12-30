@@ -57,6 +57,7 @@ const Index = () => {
                 onDurationChange={timer.setDuration}
                 formattedTime={timer.formattedTime}
                 state={timer.config.state}
+                isOvertime={timer.isOvertime}
                 onStart={timer.start}
                 onPause={timer.pause}
                 onResume={timer.resume}

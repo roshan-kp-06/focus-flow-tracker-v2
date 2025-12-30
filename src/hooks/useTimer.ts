@@ -13,6 +13,7 @@ const initialConfig: TimerConfig = {
 
 export function useTimer() {
   const [config, setConfig] = useState<TimerConfig>(initialConfig);
+  const [countdownComplete, setCountdownComplete] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<string | null>(null);
 
@@ -25,25 +26,32 @@ export function useTimer() {
 
   const getDisplayTime = useCallback(() => {
     if (config.mode === 'countdown') {
-      return Math.max(0, config.duration - config.elapsed);
+      if (config.elapsed >= config.duration) {
+        // Past the countdown - show overtime (elapsed - duration)
+        return config.elapsed - config.duration;
+      }
+      // Still counting down - show remaining
+      return config.duration - config.elapsed;
     }
     return config.elapsed;
   }, [config.mode, config.duration, config.elapsed]);
+
+  const isOvertime = useCallback(() => {
+    return config.mode === 'countdown' && config.elapsed > config.duration;
+  }, [config.mode, config.elapsed, config.duration]);
 
   const formatTime = useCallback((seconds: number) => {
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    
-    if (hrs > 0) {
-      return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }, []);
 
   const start = useCallback(() => {
     if (config.state === 'idle') {
       startTimeRef.current = new Date().toISOString();
+      setCountdownComplete(false);
     }
     setConfig(prev => ({ ...prev, state: 'running' }));
   }, [config.state]);
@@ -58,7 +66,7 @@ export function useTimer() {
 
   const stop = useCallback(() => {
     clearTimerInterval();
-    
+
     // Save session if there was any elapsed time
     if (config.elapsed > 0 && startTimeRef.current) {
       const now = new Date();
@@ -73,8 +81,9 @@ export function useTimer() {
       };
       addSession(session);
     }
-    
+
     startTimeRef.current = null;
+    setCountdownComplete(false);
     setConfig(prev => ({
       ...prev,
       elapsed: 0,
@@ -85,6 +94,7 @@ export function useTimer() {
   const reset = useCallback(() => {
     clearTimerInterval();
     startTimeRef.current = null;
+    setCountdownComplete(false);
     setConfig(prev => ({
       ...prev,
       elapsed: 0,
@@ -118,30 +128,13 @@ export function useTimer() {
       intervalRef.current = setInterval(() => {
         setConfig(prev => {
           const newElapsed = prev.elapsed + 1;
-          
-          // Check if countdown finished
-          if (prev.mode === 'countdown' && newElapsed >= prev.duration) {
-            clearTimerInterval();
-            
-            // Save session
-            if (startTimeRef.current) {
-              const now = new Date();
-              const session: WorkSession = {
-                id: crypto.randomUUID(),
-                taskName: prev.taskName || 'Untitled Session',
-                projectIds: prev.projectIds,
-                date: now.toISOString().split('T')[0],
-                duration: prev.duration,
-                startTime: startTimeRef.current,
-                endTime: now.toISOString(),
-              };
-              addSession(session);
-            }
-            
-            startTimeRef.current = null;
-            return { ...prev, elapsed: prev.duration, state: 'idle' };
+
+          // Check if countdown just hit zero (for notification purposes)
+          if (prev.mode === 'countdown' && newElapsed === prev.duration) {
+            setCountdownComplete(true);
+            // Don't stop - just mark as complete and keep counting
           }
-          
+
           return { ...prev, elapsed: newElapsed };
         });
       }, 1000);
@@ -156,6 +149,8 @@ export function useTimer() {
     config,
     displayTime: getDisplayTime(),
     formattedTime: formatTime(getDisplayTime()),
+    isOvertime: isOvertime(),
+    countdownComplete,
     start,
     pause,
     resume,

@@ -23,7 +23,7 @@ export function ProjectBreakdown({ data, totalSeconds }: ProjectBreakdownProps) 
 
   if (data.length === 0) {
     return (
-      <div className="glass-card rounded-xl p-6">
+      <div className="bg-card border border-border rounded-lg p-6">
         <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">
           By Project
         </h3>
@@ -35,7 +35,7 @@ export function ProjectBreakdown({ data, totalSeconds }: ProjectBreakdownProps) 
   }
 
   return (
-    <div className="glass-card rounded-xl p-6">
+    <div className="bg-card border border-border rounded-lg p-6">
       <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-6">
         By Project (This Month)
       </h3>
@@ -59,7 +59,7 @@ export function ProjectBreakdown({ data, totalSeconds }: ProjectBreakdownProps) 
                   {formatDuration(project.seconds)}
                 </span>
               </div>
-              <div className="h-2 bg-secondary rounded-full overflow-hidden">
+              <div className="h-2 bg-muted rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-500"
                   style={{

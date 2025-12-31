@@ -1,4 +1,4 @@
-import { Clock, Play, MoreHorizontal, Trash2, Check, ChevronDown, ChevronRight, StickyNote } from 'lucide-react';
+import { Clock, Play, MoreHorizontal, Trash2, Check, ChevronDown, ChevronRight, StickyNote, Calendar } from 'lucide-react';
 import { format, parseISO, startOfWeek, isToday, isYesterday } from 'date-fns';
 import { WorkSession, Project } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -200,6 +200,31 @@ export function SessionList({
         duration: newDuration,
       });
     }
+  };
+
+  const handleDateEdit = (session: WorkSession, newDateValue: string) => {
+    if (!onUpdateSession || !newDateValue) return;
+
+    const [year, month, day] = newDateValue.split('-').map(Number);
+
+    // Update startTime with new date but keep the time
+    const oldStartTime = parseISO(session.startTime);
+    const newStartTime = new Date(year, month - 1, day, oldStartTime.getHours(), oldStartTime.getMinutes(), oldStartTime.getSeconds());
+
+    // Update endTime with new date but keep the time
+    const oldEndTime = parseISO(session.endTime);
+    const newEndTime = new Date(year, month - 1, day, oldEndTime.getHours(), oldEndTime.getMinutes(), oldEndTime.getSeconds());
+
+    // If end time was on a different day (session crossed midnight), adjust
+    if (oldEndTime.getDate() !== oldStartTime.getDate()) {
+      newEndTime.setDate(newEndTime.getDate() + 1);
+    }
+
+    onUpdateSession(session.id, {
+      date: newDateValue,
+      startTime: newStartTime.toISOString(),
+      endTime: newEndTime.toISOString(),
+    });
   };
 
   const handleBulkDelete = () => {
@@ -576,6 +601,34 @@ export function SessionList({
                                 />
                               </>
                             )}
+                            {/* Date picker */}
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <button
+                                  className="ml-1 p-1 rounded hover:bg-muted transition-colors"
+                                  title="Change date"
+                                >
+                                  <Calendar className="h-3.5 w-3.5" />
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-3" align="start">
+                                <div className="space-y-2">
+                                  <p className="text-sm font-medium">Change date</p>
+                                  <input
+                                    type="date"
+                                    defaultValue={primarySession.date}
+                                    onChange={(e) => {
+                                      if (e.target.value) {
+                                        group.sessions.forEach(s => {
+                                          handleDateEdit(s, e.target.value);
+                                        });
+                                      }
+                                    }}
+                                    className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                                  />
+                                </div>
+                              </PopoverContent>
+                            </Popover>
                           </div>
 
                           {/* Duration - Total for groups */}
@@ -710,6 +763,32 @@ export function SessionList({
                                     onBlur={(e) => handleTimeEdit(session, 'endTime', e.target.value)}
                                     className="bg-transparent border border-transparent w-[70px] rounded-lg px-1 py-0.5 transition-all cursor-text hover:bg-muted/50 focus:bg-background focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute"
                                   />
+                                  {/* Date picker for sub-session */}
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <button
+                                        className="ml-1 p-1 rounded hover:bg-muted transition-colors"
+                                        title="Change date"
+                                      >
+                                        <Calendar className="h-3.5 w-3.5" />
+                                      </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-3" align="start">
+                                      <div className="space-y-2">
+                                        <p className="text-sm font-medium">Change date</p>
+                                        <input
+                                          type="date"
+                                          defaultValue={session.date}
+                                          onChange={(e) => {
+                                            if (e.target.value) {
+                                              handleDateEdit(session, e.target.value);
+                                            }
+                                          }}
+                                          className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                                        />
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
                                 </div>
 
                                 {/* Duration */}
